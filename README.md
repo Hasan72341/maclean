@@ -5,6 +5,21 @@ artifacts, startup items, duplicates, disk images, mail attachments, cloud-folde
 usage and AI-model caches, shows what it found, and only removes things when you
 explicitly ask.
 
+![MacLean dashboard: live system health, CPU, memory, disk, network and battery](docs/screenshots/dashboard.png)
+
+## Screenshots
+
+| | |
+|:--:|:--:|
+| ![Smart Scan results](docs/screenshots/smart-scan.png) | ![Performance](docs/screenshots/performance.png) |
+| **Smart Scan:** reclaimable space by category | **Performance:** startup items, memory and CPU, live |
+| ![Space & Files](docs/screenshots/space.png) | ![Space Lens](docs/screenshots/space-lens.png) |
+| **Space & Files:** disk usage and live disk I/O | **Space Lens:** map any folder or the whole disk |
+| ![Menu Bar & Background settings](docs/screenshots/menu-bar-settings.png) | ![Menu bar panel](docs/screenshots/menu-bar.png) |
+| **Menu Bar & Background:** run in the background, hide the Dock icon, start at login | **Menu bar panel:** live numbers and one-click actions |
+| ![Update popup](docs/screenshots/update.png) | ![Retry as administrator](docs/screenshots/admin-retry.png) |
+| **Updates:** one-click update from GitHub releases | **Can't delete something?** Retry as administrator, or get the exact path |
+
 ## Install
 
 ```sh

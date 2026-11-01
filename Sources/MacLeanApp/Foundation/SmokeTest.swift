@@ -176,7 +176,9 @@ enum SmokeTest {
         var log = ""
         Task { @MainActor in
             SystemMonitor.shared.start()
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            // MACLEAN_SMOKE_WARMUP=seconds lets live graphs fill before the first capture.
+            let warmup = Double(env["MACLEAN_SMOKE_WARMUP"] ?? "") ?? 2
+            try? await Task.sleep(nanoseconds: UInt64(warmup * 1_000_000_000))
             let nav = Navigator.shared
             var index = 0
             for section in AppSection.allCases {

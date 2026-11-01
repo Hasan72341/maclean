@@ -193,6 +193,8 @@ final class ActivityLog: ObservableObject {
     }
 
     private func save() {
+        // Smoke tests exercise removals with fake items: never write those to the real history.
+        guard SmokeTest.directory == nil else { return }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted]
