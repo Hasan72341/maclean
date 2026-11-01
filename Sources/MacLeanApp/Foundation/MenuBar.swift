@@ -9,7 +9,62 @@ final class MenuBarSettings: ObservableObject {
     static let shared = MenuBarSettings()
 
     @Published var showInMenuBar: Bool {
-        didSet { UserDefaults.standard.set(showInMenuBar, forKey: "menubar.show") }
+        didSet {
+            UserDefaults.standard.set(showInMenuBar, forKey: "menubar.show")
+            // Never leave the app with neither a Dock icon nor a menu bar item.
+            if !showInMenuBar && !showInDock { showInDock = true }
+        }
+    }
+    /// Keep running (menu bar, live numbers, junk scans) after the last window closes.
+    @Published var runInBackground: Bool {
+        didSet { UserDefaults.standard.set(runInBackground, forKey: "app.runInBackground") }
+    }
+    /// Show the Dock icon; off makes MacLean a menu-bar-only app.
+    @Published var showInDock: Bool {
+        didSet {
+            UserDefaults.standard.set(showInDock, forKey: "app.showInDock")
+            if !showInDock && !showInMenuBar { showInMenuBar = true }
+            applyActivationPolicy()
+        }
+    }
+    /// Open the main window when MacLean starts (off: start quietly in the menu bar).
+    @Published var openWindowAtLaunch: Bool {
+        didSet { UserDefaults.standard.set(openWindowAtLaunch, forKey: "app.openWindowAtLaunch") }
+    }
+    /// Sections of the menu bar panel.
+    @Published var panelSections: Set<PanelSection> {
+        didSet { UserDefaults.standard.set(panelSections.map(\.rawValue), forKey: "menubar.sections") }
+    }
+    /// Show a notification when the realtime agent reports a new threat.
+    @Published var notifyThreats: Bool {
+        didSet { UserDefaults.standard.set(notifyThreats, forKey: "menubar.notifyThreats") }
+    }
+
+    enum PanelSection: String, CaseIterable, Identifiable {
+        case protection = "Protection"
+        case metrics = "Live metrics"
+        case battery = "Battery"
+        case actions = "Quick actions"
+        case apps = "Busiest apps"
+        var id: String { rawValue }
+        var icon: String {
+            switch self {
+            case .protection: return "shield"
+            case .metrics: return "waveform.path.ecg"
+            case .battery: return "battery.75"
+            case .actions: return "bolt"
+            case .apps: return "square.stack.3d.up"
+            }
+        }
+    }
+
+    func applyActivationPolicy() {
+        guard NSApp != nil else { return }
+        let wanted: NSApplication.ActivationPolicy = showInDock ? .regular : .accessory
+        guard NSApp.activationPolicy() != wanted else { return }
+        NSApp.setActivationPolicy(wanted)
+        // Switching to .regular needs a re-activation to bring the Dock icon and menus back.
+        if wanted == .regular { NSApp.activate(ignoringOtherApps: true) }
     }
     @Published var labelStyle: LabelStyle {
         didSet { UserDefaults.standard.set(labelStyle.rawValue, forKey: "menubar.label") }
@@ -26,7 +81,13 @@ final class MenuBarSettings: ObservableObject {
     }
 
     init() {
-        showInMenuBar = UserDefaults.standard.object(forKey: "menubar.show") as? Bool ?? true
+        let defaults = UserDefaults.standard
+        showInMenuBar = defaults.object(forKey: "menubar.show") as? Bool ?? true
+        runInBackground = defaults.object(forKey: "app.runInBackground") as? Bool ?? true
+        showInDock = defaults.object(forKey: "app.showInDock") as? Bool ?? true
+        openWindowAtLaunch = defaults.object(forKey: "app.openWindowAtLaunch") as? Bool ?? true
+        notifyThreats = defaults.object(forKey: "menubar.notifyThreats") as? Bool ?? true
+        panelSections = Set((defaults.stringArray(forKey: "menubar.sections") ?? PanelSection.allCases.map(\.rawValue)).compactMap(PanelSection.init(rawValue:)))
         labelStyle = LabelStyle(rawValue: UserDefaults.standard.string(forKey: "menubar.label") ?? "") ?? .cpu
     }
 
@@ -73,8 +134,9 @@ struct MenuBarLabel: View {
     var body: some View {
         let s = monitor.latest
         HStack(spacing: 3) {
-            if (protection.status?.alertCount ?? 0) > 0 {
+            if let alerts = protection.status?.alertCount, alerts > 0 {
                 Image(systemName: "exclamationmark.shield.fill")
+                Text("\(alerts)").monospacedDigit()
             } else {
                 Image(nsImage: MenuBarIcon.image)
             }
@@ -104,7 +166,8 @@ struct MenuBarPanel: View {
         let s = monitor.latest
         VStack(alignment: .leading, spacing: 10) {
             header(s)
-            protectionCard
+            if settings.panelSections.contains(.protection) { protectionCard }
+            if settings.panelSections.contains(.metrics) {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
                 tile("CPU", value: percent(s.cpu.total), detail: "load \(String(format: "%.2f", s.loadAverage.first ?? 0))",
                      tint: tint(s.cpu.total), history: monitor.cpuHistory, max: 1) { open(.dashboard, .monitor(.topCPU)) }
@@ -115,9 +178,10 @@ struct MenuBarPanel: View {
                 tile("Network", value: "↓ \(Format.rate(s.network.rxPerSec))", detail: "↑ \(Format.rate(s.network.txPerSec))",
                      tint: Theme.info, history: monitor.netRxHistory, max: nil) { open(.dashboard, .monitor(.networkOverview)) }
             }
-            if let battery = s.battery { batteryRow(battery) }
-            actions(s)
-            topApps
+            }
+            if settings.panelSections.contains(.battery), let battery = s.battery { batteryRow(battery) }
+            if settings.panelSections.contains(.actions) { actions(s) }
+            if settings.panelSections.contains(.apps) { topApps }
             if let note {
                 Text(note).font(Type.text(11)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
             }
@@ -341,12 +405,21 @@ struct MenuBarPanel: View {
             if let error = settings.loginError {
                 Text(error).font(Type.text(10)).foregroundStyle(Theme.warning)
             }
+            Toggle("Keep running when the window is closed", isOn: $settings.runInBackground)
+            Toggle("Show in Dock", isOn: $settings.showInDock)
             Picker("Menu bar shows", selection: $settings.labelStyle) {
                 ForEach(MenuBarSettings.LabelStyle.allCases) { Text($0.rawValue).tag($0) }
             }
-            Toggle("Show MacLean in the menu bar", isOn: $settings.showInMenuBar)
+            HStack {
+                Spacer()
+                Button("All menu bar settings…") { open(.settings, .settings(.menuBar)) }
+                    .buttonStyle(.plain).font(Type.text(11, weight: .semibold)).foregroundStyle(Theme.accent)
+            }
         }
         .font(Type.text(11))
+        .toggleStyle(.switch)
+        .controlSize(.mini)
+        .tint(Theme.accent)
         .padding(10)
         .background(RoundedRectangle(cornerRadius: 9).fill(Theme.canvas))
     }
@@ -399,5 +472,54 @@ struct MenuButtonStyle: ButtonStyle {
             .background(RoundedRectangle(cornerRadius: 6).fill(
                 kind == .primary ? Theme.accent : (kind == .danger ? Theme.danger : Theme.line.opacity(0.6))))
             .opacity(enabled ? (configuration.isPressed ? 0.75 : 1) : 0.4)
+    }
+}
+
+/// Posts a notification when the realtime agent reports new threat alerts,
+/// so threats surface even when MacLean's window is closed.
+@MainActor
+final class ThreatWatcher {
+    static let shared = ThreatWatcher()
+    private var task: Task<Void, Never>?
+    private var lastCount: Int?
+
+    func start() {
+        guard task == nil else { return }
+        task = Task { [weak self] in
+            while !Task.isCancelled {
+                self?.check()
+                try? await Task.sleep(nanoseconds: 20_000_000_000)
+            }
+        }
+    }
+
+    private func check() {
+        let client = ProtectionStore.shared.monitor
+        client.connect()
+        client.refresh()
+        guard let count = client.status?.alertCount else { return }
+        defer { lastCount = count }
+        guard let previous = lastCount, count > previous, MenuBarSettings.shared.notifyThreats else { return }
+        let newest = client.alerts.first
+        Notifier.post(
+            title: count - previous == 1 ? "MacLean found a threat" : "MacLean found \(count - previous) threats",
+            body: newest.map { "\($0.title) · \(($0.path as NSString).lastPathComponent)" } ?? "Open MacLean › Protection › Alerts to review."
+        )
+    }
+}
+
+@preconcurrency import UserNotifications
+
+enum Notifier {
+    static func post(title: String, body: String) {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+        }
     }
 }

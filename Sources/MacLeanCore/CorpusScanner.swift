@@ -64,6 +64,10 @@ public final class CorpusScanner {
         yaraSeen = []
         // MacLean's own state (alerts, reports, logs) quotes signature text.
         excludedScanPaths = [PathCanon.resolve(corpus.path), PathCanon.resolve(MonitorDefaults.supportDirectory.path)]
+        // MacLean's own bundle ships YARA rule files that contain the very strings they match.
+        if Bundle.main.bundlePath.hasSuffix(".app") {
+            excludedScanPaths.insert(PathCanon.resolve(Bundle.main.bundlePath))
+        }
         if let caches = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
             excludedScanPaths.insert(
                 PathCanon.resolve(caches.appendingPathComponent("maclean").path)
@@ -312,7 +316,9 @@ public final class CorpusScanner {
     }
 
     private func isScanExcluded(_ path: String) -> Bool {
-        excludedScanPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
+        // MacLean's rule bundle, wherever a build or copy of it lives.
+        if path.contains("/maclean_MacLeanCore.bundle/") || path.hasSuffix("/maclean_MacLeanCore.bundle") { return true }
+        return excludedScanPaths.contains { path == $0 || path.hasPrefix($0 + "/") }
     }
 
     private func isExcluded(_ path: String, patterns: [String]) -> Bool {

@@ -218,5 +218,26 @@ struct MacLeanApp: App {
 /// Keeps MacLean (and its menu bar item) running after the last window closes;
 /// clicking the Dock icon reopens the window.
 final class MacLeanAppDelegate: NSObject, NSApplicationDelegate {
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        MainActor.assumeIsolated { !MenuBarSettings.shared.runInBackground }
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            let settings = MenuBarSettings.shared
+            settings.applyActivationPolicy()
+            ThreatWatcher.shared.start()
+            // Start quietly in the menu bar when asked to (never during smoke tests).
+            if !settings.openWindowAtLaunch, settings.showInMenuBar, SmokeTest.directory == nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    for window in NSApp.windows where window.identifier?.rawValue.hasPrefix("main") == true || window.title == "MacLean" {
+                        window.close()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Dock icon clicked with no window open: bring the window back.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { true }
 }

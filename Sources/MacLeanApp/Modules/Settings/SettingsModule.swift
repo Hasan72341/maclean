@@ -4,6 +4,7 @@ import SwiftUI
 enum SettingsRoute: Hashable {
     case general
     case monitoring
+    case menuBar
     case history
     case historyEntry(String)
     case statistics
@@ -34,6 +35,7 @@ enum SettingsModule {
         switch route {
         case .general: SettingsGeneralScreen()
         case .monitoring: SettingsMonitoringScreen()
+        case .menuBar: SettingsMenuBarScreen()
         case .history: SettingsHistoryScreen()
         case .historyEntry(let id): SettingsHistoryEntryScreen(entryID: id)
         case .statistics: SettingsStatisticsScreen()
@@ -58,6 +60,7 @@ enum SettingsModule {
         switch route {
         case .general: return "General"
         case .monitoring: return "Monitoring"
+        case .menuBar: return "Menu Bar & Background"
         case .history: return "History"
         case .historyEntry: return "History Entry"
         case .statistics: return "Statistics"
@@ -104,6 +107,7 @@ struct SettingsHomeScreen: View {
             VStack(spacing: 8) {
                 NavRow(icon: "paintbrush", title: "General", subtitle: "Appearance and default removal mode", value: "\(store.appearance.title) · \(store.permanentDelete ? "Permanent" : "Trash")", route: .settings(.general))
                 NavRow(icon: "waveform.path.ecg", title: "Monitoring", subtitle: "Sampling interval, pause and resume", value: store.monitorPaused ? "Paused" : SettingsMonitoringScreen.label(monitor.intervalSeconds), route: .settings(.monitoring))
+                NavRow(icon: "menubar.rectangle", title: "Menu Bar & Background", subtitle: "Run in background, Dock icon, open at login, panel", value: MenuBarSettings.shared.showInDock ? (MenuBarSettings.shared.runInBackground ? "Background" : "Window only") : "Menu bar app", route: .settings(.menuBar))
                 NavRow(icon: "keyboard", title: "Keyboard Shortcuts", subtitle: "Navigation keys and section jumps", route: .settings(.shortcuts))
             }
 

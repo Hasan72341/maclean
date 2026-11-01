@@ -133,6 +133,7 @@ enum SmokeTest {
         (.protection, .protection(.alerts)),
         (.protection, .protection(.yaraRules)),
         (.protection, .protection(.corpus)),
+        (.settings, .settings(.menuBar)),
         (.protection, .protection(.deepScan)),
         (.protection, .protection(.mailTrash)),
         (.protection, .protection(.photosDuplicates)),

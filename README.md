@@ -116,7 +116,18 @@ closes; clicking the Dock icon brings the window back. The panel shows:
   password) and **Empty Trash**;
 - the three busiest apps.
 
-The gear button sets what appears next to the icon (icon only, CPU %, memory % or free
+**Settings › Menu Bar & Background** controls how MacLean runs:
+
+- keep running when the window is closed (off: closing the window quits);
+- show in the Dock (off: a menu-bar-only app);
+- open the window at launch (off: start quietly in the menu bar);
+- open at login;
+- which panel sections appear;
+- notifications for new threats from the realtime agent, which are posted even
+  while the window is closed.
+
+Hiding both the Dock icon and the menu bar item is not allowed, so the app always stays
+reachable. The gear button sets what appears next to the icon (icon only, CPU %, memory % or free
 space), Open at login, and whether the item is shown at all. The icon turns into a red
 shield when there are threat alerts. Smoke: `--env MACLEAN_SMOKE_MENU=1` renders the
 panel in light and dark mode.
