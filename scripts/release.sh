@@ -54,11 +54,16 @@ curl -fsSL https://raw.githubusercontent.com/$REPO/main/scripts/install.sh | bas
 \`\`\`
 
 Universal build (Apple silicon + Intel), macOS 13 or newer. The installer verifies the SHA-256 in \`latest.txt\` and signs the app locally (ad-hoc), so no Developer ID or Gatekeeper prompt is involved."
-  if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-    gh release upload "$TAG" "$OUT"/* --clobber --repo "$REPO"
-  else
-    gh release create "$TAG" "$OUT"/* --repo "$REPO" --target "$(git rev-parse HEAD)" --title "MacLean $VERSION" --notes "$notes"
+  retry() { for i in 1 2 3 4 5; do "$@" && return 0; echo "  retry $i" >&2; sleep 8; done; return 1; }
+  # Draft first, upload each file with retries, manifest last, then publish:
+  # installers never see a release with missing files.
+  if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+    retry gh release create "$TAG" --repo "$REPO" --draft --target "$(git rev-parse HEAD)" --title "MacLean $VERSION" --notes "$notes"
   fi
+  for file in "$APP_PKG" "$SRC_TAR" latest.txt; do
+    retry gh release upload "$TAG" "$OUT/$file" --clobber --repo "$REPO"
+  done
+  retry gh release edit "$TAG" --repo "$REPO" --draft=false --latest >/dev/null
   echo "Published $TAG. Install with:"
   echo "  curl -fsSL https://raw.githubusercontent.com/$REPO/main/scripts/install.sh | bash"
 fi
