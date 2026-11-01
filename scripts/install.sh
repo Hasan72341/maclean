@@ -39,6 +39,56 @@ step() { printf "%s›%s %s\n" "$accent" "$reset" "$*"; }
 fail() { printf "%s✗ %s%s\n" "$red" "$*" "$reset" >&2; exit 1; }
 started=$(date +%s)
 
+human() { awk -v b="$1" 'BEGIN { if (b >= 1048576) printf "%.1f MB", b/1048576; else printf "%d KB", b/1024 }'; }
+
+# download URL FILE [EXPECTED_BYTES]
+# Shows a live bar: percent, bytes done of total, speed and time left.
+download() {
+  local url="$1" out="$2" total="${3:-}"
+  if [[ -z "$total" || "$total" == 0 ]]; then
+    total="$(curl -fsIL --retry 2 --connect-timeout 10 "$url" | awk 'tolower($1) == "content-length:" { n = $2 } END { gsub(/\r/, "", n); print n + 0 }')"
+  fi
+  rm -f "$out"
+  curl -fsSL --retry 3 --retry-delay 1 --connect-timeout 15 "$url" -o "$out" &
+  local pid=$! have=0 pct rate left width=28 filled bar line last_pct=-1
+  local tick=0 first=-1 hist=() rate_from secs
+  while kill -0 "$pid" 2>/dev/null; do
+    have=$(stat -f%z "$out" 2>/dev/null || echo 0)
+    tick=$(( tick + 1 ))
+    # Speed over the last ~3 s (12 samples of 0.25 s), counted from the first byte.
+    (( have > 0 && first < 0 )) && first=$tick
+    hist+=("$have")
+    rate=0
+    if (( first >= 0 )); then
+      rate_from=$(( ${#hist[@]} > 12 ? ${#hist[@]} - 13 : first - 1 ))
+      (( rate_from < 0 )) && rate_from=0
+      secs=$(( ${#hist[@]} - 1 - rate_from ))
+      (( secs > 0 )) && rate=$(( (have - ${hist[$rate_from]}) * 4 / secs ))
+    fi
+    if (( total > 0 )); then
+      pct=$(( have * 100 / total )); (( pct > 100 )) && pct=100
+      filled=$(( pct * width / 100 ))
+      bar="$(printf '%*s' "$filled" '' | tr ' ' '#')$(printf '%*s' $(( width - filled )) '' | tr ' ' '-')"
+      if (( have == 0 )); then left="connecting…"
+      elif (( rate > 0 )); then left="$(( (total - have + rate - 1) / rate ))s left"
+      else left="…"; fi
+      line="$(printf "  [%s] %3d%%  %s / %s  %s/s  %s" "$bar" "$pct" "$(human "$have")" "$(human "$total")" "$(human "$rate")" "$left")"
+    else
+      pct=0; line="$(printf "  %s downloaded  %s/s" "$(human "$have")" "$(human "$rate")")"
+    fi
+    if [[ -t 1 ]]; then
+      printf "\r\033[K%s" "$line"
+    elif (( pct / 25 != last_pct / 25 )); then
+      echo "$line"; last_pct=$pct
+    fi
+    sleep 0.25
+  done
+  if ! wait "$pid"; then [[ -t 1 ]] && printf "\r\033[K"; return 1; fi
+  have=$(stat -f%z "$out" 2>/dev/null || echo 0)
+  line="$(printf "  [%s] 100%%  %s in %ss" "$(printf '%*s' $width '' | tr ' ' '#')" "$(human "$have")" "$(( (tick + 3) / 4 ))")"
+  if [[ -t 1 ]]; then printf "\r\033[K%s\n" "$line"; else echo "$line"; fi
+}
+
 [[ "$(uname -s)" == "Darwin" ]] || fail "MacLean runs on macOS only."
 major="$(sw_vers -productVersion | cut -d. -f1)"
 (( major >= 13 )) || fail "MacLean needs macOS 13 Ventura or newer (this Mac has $(sw_vers -productVersion))."
@@ -103,15 +153,18 @@ FILES="$(field download_base)"; FILES="${FILES:-$BASE}"
 if [[ "$MODE" == "source" ]]; then
   xcrun --find swift >/dev/null 2>&1 || fail "Building from source needs Xcode or the Command Line Tools (xcode-select --install)."
   step "Downloading source $version"
-  curl -fsSL --retry 3 "$FILES/$(field source)" -o "$WORK/src.tar.gz"
+  download "$FILES/$(field source)" "$WORK/src.tar.gz" || fail "Download failed; check your connection and try again."
   [[ "$(shasum -a 256 "$WORK/src.tar.gz" | cut -d' ' -f1)" == "$(field source_sha256)" ]] || fail "Source checksum mismatch."
   mkdir -p "$WORK/src" && tar -xzf "$WORK/src.tar.gz" -C "$WORK/src"
   step "Building (this takes a minute or two the first time)…"
   ( cd "$WORK/src" && scripts/package-app.sh ) | tail -1
   NEW_APP="$WORK/src/dist/MacLean.app"
 else
-  step "Downloading MacLean $version"
-  curl -fL --progress-bar --retry 3 --retry-delay 1 --connect-timeout 15 "$FILES/$(field app)" -o "$WORK/MacLean.tar.xz"
+  current="$(defaults read "$(existing_app 2>/dev/null || echo /nonexistent)/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)"
+  if [[ -n "$current" && "$current" != "$version" ]]; then step "Updating MacLean $current → $version"
+  elif [[ -n "$current" ]]; then step "Reinstalling MacLean $version"; else step "Downloading MacLean $version"; fi
+  download "$FILES/$(field app)" "$WORK/MacLean.tar.xz" "$(field app_size)" || fail "Download failed; check your connection and try again."
+  step "Verifying checksum and unpacking"
   [[ "$(shasum -a 256 "$WORK/MacLean.tar.xz" | cut -d' ' -f1)" == "$(field app_sha256)" ]] || fail "Download checksum mismatch; try again."
   tar -xJf "$WORK/MacLean.tar.xz" -C "$WORK"
   NEW_APP="$WORK/MacLean.app"

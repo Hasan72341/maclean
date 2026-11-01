@@ -126,7 +126,15 @@ enum MenuBarIcon {
 }
 
 /// Text shown next to the menu bar icon.
+/// Keeps SwiftUI's openWindow action reachable from AppKit callbacks
+/// (notification clicks) when no window exists.
+@MainActor enum WindowOpener {
+    static var action: OpenWindowAction?
+}
+
 struct MenuBarLabel: View {
+    @Environment(\.openWindow) private var openWindow
+    @ObservedObject var updater = Updater.shared
     @ObservedObject var monitor = SystemMonitor.shared
     @ObservedObject var settings = MenuBarSettings.shared
     @ObservedObject var protection = ProtectionStore.shared.monitor
@@ -146,12 +154,15 @@ struct MenuBarLabel: View {
             case .memory: Text("\(Int((s.memory.usedFraction * 100).rounded()))%").monospacedDigit()
             case .free: Text(Format.bytes(s.disk.availableImportant > 0 ? s.disk.availableImportant : s.disk.available))
             }
+            if updater.updateAvailable { Image(systemName: "arrow.down.circle.fill") }
         }
+        .onAppear { WindowOpener.action = openWindow }
     }
 }
 
 /// The popover shown from the menu bar.
 struct MenuBarPanel: View {
+    @ObservedObject private var updater = Updater.shared
     @ObservedObject private var monitor = SystemMonitor.shared
     @ObservedObject private var cleanup = CleanupStore.shared
     @ObservedObject private var store = MonitorStore.shared
@@ -166,6 +177,7 @@ struct MenuBarPanel: View {
         let s = monitor.latest
         VStack(alignment: .leading, spacing: 10) {
             header(s)
+            if updater.updateAvailable || updater.phase.busy { updateRow }
             if settings.panelSections.contains(.protection) { protectionCard }
             if settings.panelSections.contains(.metrics) {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
@@ -424,6 +436,42 @@ struct MenuBarPanel: View {
         .background(RoundedRectangle(cornerRadius: 9).fill(Theme.canvas))
     }
 
+    private var updateRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.down.circle.fill").font(.system(size: 18)).foregroundStyle(Theme.accent)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("MacLean \(updater.release?.version ?? "") is available").font(Type.text(12, weight: .semibold)).foregroundStyle(Theme.ink)
+                    Text("You have \(Updater.currentVersion)").font(Type.mono(10)).foregroundStyle(Theme.muted)
+                }
+                Spacer()
+                switch updater.phase {
+                case .downloading:
+                    Button("Cancel") { updater.cancelDownload() }.buttonStyle(MenuButtonStyle(kind: .secondary))
+                case .verifying, .installing, .checking:
+                    ProgressView().controlSize(.small)
+                default:
+                    Button("Update") { updater.install() }.buttonStyle(MenuButtonStyle(kind: .primary))
+                }
+            }
+            switch updater.phase {
+            case .downloading(let received, let total, let rate):
+                UpdateProgressBar(received: received, total: total, rate: rate, compact: true)
+            case .verifying:
+                Text("Verifying…").font(Type.text(10)).foregroundStyle(Theme.muted)
+            case .installing:
+                Text("Installing, MacLean will reopen…").font(Type.text(10)).foregroundStyle(Theme.muted)
+            case .failed(let message):
+                Text(message).font(Type.text(10)).foregroundStyle(Theme.danger)
+            default:
+                EmptyView()
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 9).fill(Theme.accent.opacity(0.10)))
+        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Theme.accent.opacity(0.35)))
+    }
+
     private var footer: some View {
         HStack {
             Button("Open MacLean") { openMain() }.buttonStyle(MenuButtonStyle(kind: .primary))
@@ -448,12 +496,17 @@ struct MenuBarPanel: View {
     }
 
     private func openMain() {
+        WindowOpener.action = openWindow
+        Self.showMainWindow()
+    }
+
+    static func showMainWindow() {
         NSApp.activate(ignoringOtherApps: true)
         if let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true || $0.title == "MacLean" }) {
             if window.isMiniaturized { window.deminiaturize(nil) }
             window.makeKeyAndOrderFront(nil)
         } else {
-            openWindow(id: "main")
+            WindowOpener.action?(id: "main")
         }
     }
 }
@@ -511,7 +564,21 @@ final class ThreatWatcher {
 @preconcurrency import UserNotifications
 
 enum Notifier {
-    static func post(title: String, body: String) {
+    static let updateCategory = "maclean.update"
+    static let updateAction = "maclean.update.install"
+
+    /// Registers the "Update" button and routes clicks back into the app.
+    @MainActor static func configure() {
+        let center = UNUserNotificationCenter.current()
+        center.delegate = NotificationHandler.shared
+        let update = UNNotificationAction(identifier: updateAction, title: "Update", options: [.foreground])
+        let later = UNNotificationAction(identifier: "maclean.update.later", title: "Later", options: [])
+        center.setNotificationCategories([
+            UNNotificationCategory(identifier: updateCategory, actions: [update, later], intentIdentifiers: [], options: []),
+        ])
+    }
+
+    static func post(title: String, body: String, category: String? = nil, identifier: String? = nil) {
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
@@ -519,7 +586,38 @@ enum Notifier {
             content.title = title
             content.body = body
             content.sound = .default
-            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+            if let category { content.categoryIdentifier = category }
+            UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: identifier ?? UUID().uuidString, content: content, trigger: nil))
         }
+    }
+}
+
+final class NotificationHandler: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    static let shared = NotificationHandler()
+
+    /// Show banners even while MacLean is the frontmost app.
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound, .list])
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let category = response.notification.request.content.categoryIdentifier
+        let action = response.actionIdentifier
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated {
+                if category == Notifier.updateCategory {
+                    if action == "maclean.update.later" { return }
+                    MenuBarPanel.showMainWindow()
+                    Updater.shared.showPopup = true
+                    if action == Notifier.updateAction { Updater.shared.install() }
+                } else if action == UNNotificationDefaultActionIdentifier {
+                    Navigator.shared.go(.protection, nil)
+                    MenuBarPanel.showMainWindow()
+                }
+            }
+        }
+        completionHandler()
     }
 }

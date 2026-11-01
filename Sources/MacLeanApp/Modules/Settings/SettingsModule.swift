@@ -136,7 +136,7 @@ struct SettingsHomeScreen: View {
             SectionHeader(title: "About")
             VStack(spacing: 8) {
                 NavRow(icon: "doc.text", title: "Licenses", subtitle: "YARA, OpenSSL and signature-base notices", value: store.licenses.isEmpty ? nil : Format.count(store.licenses.count), route: .settings(.licenses))
-                NavRow(icon: "info.circle", title: "About MacLean", subtitle: "Version and project information", value: SettingsStore.appVersion, route: .settings(.about))
+                NavRow(icon: "info.circle", title: "About & Updates", subtitle: "Version, software update, project information", value: Updater.shared.updateAvailable ? "Update to \(Updater.shared.release?.version ?? "")" : SettingsStore.appVersion, route: .settings(.about))
             }
         }
         .onAppear {

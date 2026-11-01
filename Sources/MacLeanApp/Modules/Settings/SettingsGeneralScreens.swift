@@ -229,6 +229,7 @@ struct SettingsAboutScreen: View {
                         .font(Type.text(12)).foregroundStyle(Theme.muted)
                 }
             }
+            SoftwareUpdateCard()
             Card("Details") {
                 VStack(spacing: 0) {
                     KeyValueRow(key: "App version", value: SettingsStore.appVersion, mono: true)

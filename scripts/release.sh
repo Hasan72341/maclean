@@ -8,6 +8,9 @@ set -euo pipefail
 #
 #   scripts/release.sh             build only
 #   scripts/release.sh --publish   tag v<version> and publish a GitHub release (gh CLI)
+#
+# What's new: put it in RELEASE_NOTES (env) or dist/NOTES.md. It becomes the top
+# of the GitHub release and is shown in every running copy's update popup.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -36,6 +39,7 @@ version=$VERSION
 download_base=https://github.com/$REPO/releases/download/$TAG
 app=$APP_PKG
 app_sha256=$(sha "$OUT/$APP_PKG")
+app_size=$(stat -f%z "$OUT/$APP_PKG")
 source=$SRC_TAR
 source_sha256=$(sha "$OUT/$SRC_TAR")
 date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -47,11 +51,16 @@ ls -lh "$OUT" | awk 'NR > 1 { print "  " $5 "\t" $9 }'
 if [[ "${1:-}" == "--publish" ]]; then
   [[ -z "$(git status --porcelain)" ]] || { echo "Commit your changes before publishing." >&2; exit 1; }
   git push origin HEAD
-  notes="Install or update:
+  whatsnew="${RELEASE_NOTES:-$(cat dist/NOTES.md 2>/dev/null || true)}"
+  notes="${whatsnew:+$whatsnew
+
+}Install or update:
 
 \`\`\`sh
 curl -fsSL https://raw.githubusercontent.com/$REPO/main/scripts/install.sh | bash
 \`\`\`
+
+MacLean 0.3.4 and newer also update themselves: they check this release, show an update popup and notification, and install with one click.
 
 Universal build (Apple silicon + Intel), macOS 13 or newer. The installer verifies the SHA-256 in \`latest.txt\` and signs the app locally (ad-hoc), so no Developer ID or Gatekeeper prompt is involved."
   retry() { for i in 1 2 3 4 5; do "$@" && return 0; echo "  retry $i" >&2; sleep 8; done; return 1; }

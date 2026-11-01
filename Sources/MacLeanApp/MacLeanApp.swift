@@ -227,6 +227,8 @@ final class MacLeanAppDelegate: NSObject, NSApplicationDelegate {
             let settings = MenuBarSettings.shared
             settings.applyActivationPolicy()
             ThreatWatcher.shared.start()
+            Notifier.configure()
+            if SmokeTest.directory == nil { Updater.shared.start() }
             // Start quietly in the menu bar when asked to (never during smoke tests).
             if !settings.openWindowAtLaunch, settings.showInMenuBar, SmokeTest.directory == nil {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {

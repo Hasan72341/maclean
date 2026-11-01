@@ -33,7 +33,24 @@ updates MacLean.
 Because the signature is made locally, macOS treats each install as a new app, so
 Full Disk Access has to be granted again after an update.
 
-### Building and releasing
+### Updates
+
+MacLean checks GitHub releases at launch and every 6 hours. You can turn this off
+in Settings › About & Updates.
+
+When a newer release is out, every running copy shows:
+
+- an update popup in the window;
+- a macOS notification with an **Update** button;
+- an update row in the menu bar panel.
+
+**Update** downloads the release with a progress bar and checks its SHA-256. It then
+replaces the app, signs it locally and reopens it. Settings and history are kept.
+
+To ship an update, bump `VERSION`, commit, and run `scripts/release.sh --publish`.
+The text in `RELEASE_NOTES` (or `dist/NOTES.md`) shows in the popup.
+
+## Building and releasing
 
 | Command | What it does |
 |---|---|

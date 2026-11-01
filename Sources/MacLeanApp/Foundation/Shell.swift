@@ -8,6 +8,7 @@ struct RootShell: View {
     @StateObject private var monitor = SystemMonitor.shared
     @StateObject private var activity = ActivityLog.shared
     @StateObject private var toasts = ToastCenter.shared
+    @ObservedObject private var updater = Updater.shared
 
     var body: some View {
         HStack(spacing: 0) {
@@ -44,6 +45,9 @@ struct RootShell: View {
         .environmentObject(activity)
         .environmentObject(toasts)
         .overlay(alignment: .top) { ToastOverlay() }
+        .sheet(isPresented: Binding(get: { updater.showPopup && !smoke }, set: { if !$0 { updater.showPopup = false } })) {
+            UpdateSheet()
+        }
         .background {
             // Keyboard back: ⌘[ and Esc.
             Button("") { nav.pop() }
