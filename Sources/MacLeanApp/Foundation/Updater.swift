@@ -55,6 +55,7 @@ final class Updater: NSObject, ObservableObject {
     private var timer: Task<Void, Never>?
     private var downloadTask: URLSessionDownloadTask?
     private var downloadStarted = Date()
+    private var resumeAttempts = 0
     private var session: URLSession?
 
     static var currentVersion: String {
@@ -174,6 +175,7 @@ final class Updater: NSObject, ObservableObject {
         showPopup = true
         phase = .downloading(received: 0, total: release.size ?? 0, rate: 0)
         downloadStarted = Date()
+        resumeAttempts = 0
         let session = URLSession(configuration: .ephemeral, delegate: self, delegateQueue: .main)
         self.session = session
         let task = session.downloadTask(with: release.downloadURL)
@@ -326,7 +328,25 @@ extension Updater: URLSessionDownloadDelegate {
 
     nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         guard let error, (error as? URLError)?.code != .cancelled else { return }
-        MainActor.assumeIsolated { phase = .failed(Updater.describe(error)) }
+        let resumeData = (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+        MainActor.assumeIsolated {
+            // Flaky connection: pick up where the download stopped, a few times.
+            if resumeAttempts < 5, let session = self.session {
+                resumeAttempts += 1
+                let delay = Double(resumeAttempts) * 2
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    MainActor.assumeIsolated {
+                        guard let self, case .downloading = self.phase else { return }
+                        let next = resumeData.map { session.downloadTask(withResumeData: $0) }
+                            ?? self.release.map { session.downloadTask(with: $0.downloadURL) }
+                        self.downloadTask = next
+                        next?.resume()
+                    }
+                }
+                return
+            }
+            phase = .failed(Updater.describe(error))
+        }
     }
 }
 

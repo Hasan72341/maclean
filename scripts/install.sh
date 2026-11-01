@@ -49,7 +49,15 @@ download() {
     total="$(curl -fsIL --retry 2 --connect-timeout 10 "$url" | awk 'tolower($1) == "content-length:" { n = $2 } END { gsub(/\r/, "", n); print n + 0 }')"
   fi
   rm -f "$out"
-  curl -fsSL --retry 3 --retry-delay 1 --connect-timeout 15 "$url" -o "$out" &
+  # Up to 5 attempts; each one resumes where the last stopped (-C -), so a
+  # dropped connection costs seconds, not the whole download.
+  (
+    for attempt in 1 2 3 4 5; do
+      curl -fsSL --retry 3 --retry-delay 1 --connect-timeout 15 --speed-limit 1024 --speed-time 20 -C - "$url" -o "$out" && exit 0
+      sleep $(( attempt * 2 ))
+    done
+    exit 1
+  ) &
   local pid=$! have=0 pct rate left width=28 filled bar line last_pct=-1
   local tick=0 first=-1 hist=() rate_from secs
   while kill -0 "$pid" 2>/dev/null; do
