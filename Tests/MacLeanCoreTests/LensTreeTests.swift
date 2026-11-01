@@ -133,3 +133,21 @@ struct LensArchiveTests {
         #expect(aggregate.aggregateCount == before.2 - 1)
     }
 }
+
+@Suite("Scanner self-detection")
+struct ScannerSelfDetectionTests {
+    @Test func yaraRuleSourcesAreRecognised() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("yarself-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let rule = dir.appendingPathComponent("evil.yar")
+        try "rule EvilOSX_1 {\n strings:\n  $a = \"EvilOSX\"\n condition:\n  $a\n}\n".write(to: rule, atomically: true, encoding: .utf8)
+        let renamedBinary = dir.appendingPathComponent("payload.yar")
+        try Data([0xCF, 0xFA, 0xED, 0xFE, 0, 0, 1, 0] + Array("rule x { condition: true }".utf8)).write(to: renamedBinary)
+        let plain = dir.appendingPathComponent("notes.yar")
+        try "EvilOSX was mentioned here".write(to: plain, atomically: true, encoding: .utf8)
+        #expect(CorpusScanner.isYaraRuleFile(rule))
+        #expect(!CorpusScanner.isYaraRuleFile(renamedBinary))
+        #expect(!CorpusScanner.isYaraRuleFile(plain))
+    }
+}

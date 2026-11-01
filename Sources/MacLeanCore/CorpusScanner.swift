@@ -288,7 +288,7 @@ public final class CorpusScanner {
     private func addYaraCandidate(_ url: URL) {
         guard yaraEnabled, yaraCandidates.count < maxFiles else { return }
         let path = PathCanon.resolve(url.path)
-        guard !isScanExcluded(path), !isCorpusDatabase(url) else { return }
+        guard !isScanExcluded(path), !isCorpusDatabase(url), !Self.isYaraRuleFile(url) else { return }
         guard yaraSeen.insert(path).inserted else { return }
         yaraCandidates.append(URL(fileURLWithPath: path))
     }
@@ -313,6 +313,20 @@ public final class CorpusScanner {
         let query = "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND (name = 'Malware' OR name LIKE 'MalwareRule%')"
         guard sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK, sqlite3_step(statement) == SQLITE_ROW else { return false }
         return sqlite3_column_int(statement, 0) >= 2
+    }
+
+    /// YARA rule sources (`rule name { … condition: … }`) describe malware; they
+    /// are not malware, and they always match their own strings. Recognised by
+    /// extension and by their rule structure, so a renamed binary is still scanned.
+    static func isYaraRuleFile(_ url: URL) -> Bool {
+        guard ["yar", "yara"].contains(url.pathExtension.lowercased()),
+              let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        guard let head = try? handle.read(upToCount: 256 * 1024), !head.isEmpty,
+              !head.contains(0) else { return false } // text only
+        let text = String(decoding: head, as: UTF8.self)
+        return text.range(of: #"(?m)^\s*(private\s+|global\s+)*rule\s+\w+"#, options: .regularExpression) != nil
+            && text.contains("condition:")
     }
 
     private func isScanExcluded(_ path: String) -> Bool {
