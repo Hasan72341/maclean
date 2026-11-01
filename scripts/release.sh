@@ -58,7 +58,7 @@ Universal build (Apple silicon + Intel), macOS 13 or newer. The installer verifi
   # Draft first, upload each file with retries, manifest last, then publish:
   # installers never see a release with missing files.
   if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-    retry gh release create "$TAG" --repo "$REPO" --draft --target "$(git rev-parse HEAD)" --title "MacLean $VERSION" --notes "$notes"
+    retry gh release create "$TAG" --repo "$REPO" --draft --target "$(git rev-parse HEAD)" --title "MacLean $VERSION" --notes "$notes" >/dev/null
   fi
   for file in "$APP_PKG" "$SRC_TAR" latest.txt; do
     retry gh release upload "$TAG" "$OUT/$file" --clobber --repo "$REPO"
