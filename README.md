@@ -88,15 +88,6 @@ The text in `RELEASE_NOTES` (or `dist/NOTES.md`) shows in the popup.
 
 The version comes from `VERSION`.
 
-This is an original, clean-room implementation. It is **not** affiliated with
-MacPaw and contains no CleanMyMac code, assets, signatures or branding. The
-feature inventory was informed by a public reverse-engineering study of
-CleanMyMac 5.7.2 (`SystemJunkScanning`, `TrashJunkScanning`, `PrivacyScanning`,
-`UninstallerScanning`, `SpaceLensScanning`, `OrganizeScanning`,
-`PerformanceScanning`, `MailJunkScanning`, `CloudStorageScanning`,
-`UpdaterScanning`, `UnusedDiskImagesScanning`, `LocalModelScanning`,
-`AIToolScanning`), but all code here was written from scratch.
-
 ## Build
 
 Requires macOS 13+ and Swift 6.
@@ -571,7 +562,7 @@ Corpus YARA behavior:
 
 ## What is implemented
 
-| CleanMyMac module | maclean equivalent |
+| Scanner | maclean implementation |
 |---|---|
 | `SystemJunkScanning` | user caches/logs, saved state, crash reports, Mail downloads, iOS backups, sandbox container caches/autosave, system caches/logs (root), Xcode DerivedData/Archives/DeviceSupport/previews/simulator caches/runtimes, Homebrew/npm/Gradle/Cargo/SwiftPM |
 | `TrashJunkScanning` | `~/.Trash`, mounted-volume `.Trashes/<uid>` |
@@ -632,13 +623,13 @@ Literal full parity is not achievable or appropriate for this project:
 
 ## Open-source detection corpora
 
-`maclean` ships the bundled signature-base macOS subset described above, but no
-proprietary corpus. The `protection` command can use these open-source corpora,
-installed and updated by you:
+`maclean` ships the bundled signature-base macOS subset described above. The
+`protection` command can also use these open-source corpora, installed and
+updated by you:
 
 | Corpus | License | Coverage | How to use |
 |---|---|---|---|
-| **ClamAV** + official CVDs | Engine GPL-2.0; database distributed free by Cisco Talos (update with `freshclam`) | General malware incl. macOS families; not CleanMyMac-grade | `brew install clamav && freshclam`; `maclean protection --clamav --path ~/Downloads` |
+| **ClamAV** + official CVDs | Engine GPL-2.0; database distributed free by Cisco Talos (update with `freshclam`) | General malware incl. macOS families | `brew install clamav && freshclam`; `maclean protection --clamav --path ~/Downloads` |
 | **YARA Forge Core** | Tooling GPL-3.0; each rule keeps its source license | Curated weekly package from 45+ repos, high accuracy/low FP | Download a release package, unzip, pass the rules directory/file to `--yara-rules` |
 | **Neo23x0/signature-base** | Detection Rule License 1.1 (attribution) | ~15 macOS-specific rules plus broad cross-platform coverage | `git clone https://github.com/Neo23x0/signature-base`; pass `signature-base/yara` as `--yara-rules` |
 | **Yara-Rules/rules** | GPL-2.0 | Older, small macOS set; general malware | Pass the directory/file at runtime; GPL applies to the rules |
