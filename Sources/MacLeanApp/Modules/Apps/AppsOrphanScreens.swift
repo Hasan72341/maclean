@@ -114,7 +114,7 @@ struct AppsOrphansScreen: View {
                 Picker("Confidence", selection: $filter) {
                     ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
                 }
-                .pickerStyle(.segmented).labelsHidden().frame(width: 380)
+                .pickerStyle(.segmented).labelsHidden().flexibleWidth(380)
                 Picker("Sort", selection: $sort) {
                     ForEach(Sort.allCases) { Text($0.rawValue).tag($0) }
                 }

@@ -265,7 +265,7 @@ struct CleanupRulesCatalogScreen: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 400)
+                .flexibleWidth(400)
                 Spacer()
                 Text("\(Format.count(rules.count)) shown").font(Type.text(11)).foregroundStyle(Theme.muted)
             }
@@ -473,7 +473,7 @@ private struct BundledRuleEditor: View {
                         Text("Safe").tag(Risk.safe)
                         Text("Caution").tag(Risk.caution)
                     }
-                    .pickerStyle(.segmented).labelsHidden().frame(width: 220)
+                    .pickerStyle(.segmented).labelsHidden().flexibleWidth(220)
                     Spacer()
                 }
                 if base.scanOnly {
@@ -569,7 +569,7 @@ struct CustomRuleEditorScreen: View {
                     Picker("Category", selection: $draft.category) {
                         ForEach(JunkCategory.allCases.filter { $0 != .trash }, id: \.self) { Label($0.title, systemImage: CleanupText.icon($0)).tag($0) }
                     }
-                    .labelsHidden().frame(width: 240)
+                    .labelsHidden().flexibleWidth(240)
                 }
                 Toggle("Rule is on", isOn: $draft.enabled).toggleStyle(EditorialToggleStyle())
             }
@@ -627,7 +627,7 @@ struct CustomRuleEditorScreen: View {
                         Text("Safe").tag(Risk.safe)
                         Text("Caution").tag(Risk.caution)
                     }
-                    .pickerStyle(.segmented).labelsHidden().frame(width: 220)
+                    .pickerStyle(.segmented).labelsHidden().flexibleWidth(220)
                 }
                 Toggle("Pre-select items found by this rule", isOn: $draft.autoselect)
                     .toggleStyle(EditorialToggleStyle())
@@ -812,7 +812,7 @@ struct CleanupScanConsoleScreen: View {
                     Picker("Detail", selection: $trace.verbosity) {
                         ForEach(ScanVerbosity.allCases) { Text($0.title).tag($0) }
                     }
-                    .pickerStyle(.segmented).labelsHidden().frame(width: 240)
+                    .pickerStyle(.segmented).labelsHidden().flexibleWidth(240)
                     .help("Applies to new lines. Trace logs every measured path.")
                     Toggle("Follow", isOn: $follow).toggleStyle(EditorialToggleStyle())
                     Spacer()
@@ -891,7 +891,7 @@ struct CleanupRuleTimingsScreen: View {
             Picker("Sort", selection: $sort) {
                 ForEach(Sort.allCases) { Text($0.rawValue).tag($0) }
             }
-            .pickerStyle(.segmented).labelsHidden().frame(width: 280)
+            .pickerStyle(.segmented).labelsHidden().flexibleWidth(280)
         } content: {
             TileGrid {
                 StatTile(label: "Rules run", value: Format.count(stats.filter { $0.status == .done }.count), tint: Theme.info)

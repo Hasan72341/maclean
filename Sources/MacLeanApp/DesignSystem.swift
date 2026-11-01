@@ -33,19 +33,22 @@ enum Theme {
 }
 
 enum Type {
+    /// Interface size multiplier (Settings › General › Interface size).
+    static var scale: CGFloat { InterfaceScale.current }
+
     static func display(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .serif)
+        .system(size: size * scale, weight: weight, design: .serif)
     }
 
     static func text(_ size: CGFloat = 14, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight)
+        .system(size: size * scale, weight: weight)
     }
 
     static func mono(_ size: CGFloat = 11, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .monospaced)
+        .system(size: size * scale, weight: weight, design: .monospaced)
     }
 
-    static let label = Font.system(size: 10, weight: .semibold, design: .monospaced)
+    static var label: Font { .system(size: 10 * scale, weight: .semibold, design: .monospaced) }
 }
 
 enum Metric {

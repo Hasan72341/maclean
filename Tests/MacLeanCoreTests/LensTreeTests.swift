@@ -151,3 +151,53 @@ struct ScannerSelfDetectionTests {
         #expect(!CorpusScanner.isYaraRuleFile(plain))
     }
 }
+
+@Suite("Administrator retry")
+struct AdminRemovalTests {
+    @Test func onlySafePathsQualify() throws {
+        let home = NSHomeDirectory()
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("adm-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let file = dir.appendingPathComponent("leftover.plist")
+        try Data("x".utf8).write(to: file)
+        let link = dir.appendingPathComponent("link")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
+
+        #expect(AdminRemoval.verdict(path: file.path, reason: "Permission denied") == .elevate)
+        #expect(AdminRemoval.verdict(path: dir.appendingPathComponent("missing").path, reason: "x") == .gone)
+        #expect(AdminRemoval.verdict(path: link.path, reason: "x") == .refused("symbolic link"))
+        #expect(AdminRemoval.verdict(path: "Safari (412)", reason: "x") == .notAPath)
+        #expect(AdminRemoval.verdict(path: file.path, reason: "Foo is running — quit it first") == .refused("the app is running — quit it first"))
+        #expect(AdminRemoval.verdict(path: "/System/Library/CoreServices", reason: "x") == .refused("protected by macOS"))
+        #expect(AdminRemoval.verdict(path: "/usr/bin", reason: "x") == .refused("protected by macOS"))
+        #expect(AdminRemoval.verdict(path: "/Library/Application Support", reason: "x") == .refused("a system folder"))
+        #expect(AdminRemoval.verdict(path: "/Applications", reason: "x") == .refused("a system folder"))
+        #expect(AdminRemoval.verdict(path: home, reason: "x") == .refused("a home folder"))
+        #expect(AdminRemoval.verdict(path: home + "/Documents", reason: "x") == .refused("a protected folder in your home"))
+        #expect(AdminRemoval.verdict(path: home + "/Library/Keychains", reason: "x") == .refused("protected personal data"))
+    }
+
+    @Test func removesEachItemAndReportsPerItem() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("adm-run-\(UUID().uuidString)")
+        let fakeHome = base.appendingPathComponent("home")
+        try FileManager.default.createDirectory(at: fakeHome.appendingPathComponent(".Trash"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let a = base.appendingPathComponent("it's a leftover")   // quote in the name
+        try FileManager.default.createDirectory(at: a.appendingPathComponent("inner"), withIntermediateDirectories: true)
+        let b = base.appendingPathComponent("b.cache")
+        try Data("x".utf8).write(to: b)
+        let gone = base.appendingPathComponent("gone").path
+        let outcome = AdminRemoval.run([a.path, b.path, gone], elevated: false, home: fakeHome.path)
+        #expect(outcome.error == nil)
+        #expect(Set(outcome.removed) == Set([a.path, b.path, gone]))
+        #expect(!FileManager.default.fileExists(atPath: a.path))
+        #expect(FileManager.default.fileExists(atPath: fakeHome.appendingPathComponent(".Trash/it's a leftover/inner").path))
+    }
+
+    @Test func parsesOsascriptOutput() {
+        let parsed = AdminRemoval.parse("OK\t/a b\tmoved to Trash\rFAIL\t/c\tOperation not permitted\r")
+        #expect(parsed.count == 2)
+        #expect(parsed[1] == .init(path: "/c", ok: false, message: "Operation not permitted"))
+    }
+}

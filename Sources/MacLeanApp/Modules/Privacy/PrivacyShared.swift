@@ -101,7 +101,7 @@ struct PrivacySortPicker: View {
             ForEach(PrivacySort.allCases) { Text($0.rawValue).tag($0) }
         }
         .pickerStyle(.segmented)
-        .frame(width: 220)
+        .flexibleWidth(220)
         .labelsHidden()
     }
 }

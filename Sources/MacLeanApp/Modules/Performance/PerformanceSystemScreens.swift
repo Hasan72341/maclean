@@ -34,7 +34,7 @@ struct PerformanceSnapshotsScreen: View {
                         .font(Type.text(11)).foregroundStyle(Theme.muted)
                     Spacer()
                     NavRow(icon: "scissors", title: "Thin snapshots", subtitle: "reclaim up to 10 GB", route: .performance(.thinSnapshots))
-                        .frame(width: 260)
+                        .flexibleWidth(260)
                 }
             }
 

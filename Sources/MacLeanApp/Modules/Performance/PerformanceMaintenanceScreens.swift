@@ -59,7 +59,7 @@ struct PerformanceMaintenanceScreen: View {
         let running = PerformanceTask.allCases.filter { store.runs[$0]?.running == true }
         ScreenScaffold("Maintenance", subtitle: "macOS housekeeping tasks — each runs the real system tool and shows its output") {
             NavRow(icon: "list.bullet.rectangle", title: "History", value: Format.count(store.history.count), route: .performance(.maintenanceHistory))
-                .frame(width: 200)
+                .flexibleWidth(200)
         } content: {
             TileGrid {
                 StatTile(label: "Tasks", value: "\(PerformanceTask.allCases.count)", detail: "\(PerformanceTask.allCases.filter(\.needsAdmin).count) need admin", icon: "wrench.and.screwdriver")
@@ -266,7 +266,7 @@ struct PerformanceHistoryScreen: View {
                 Text("All tasks").tag("all")
                 ForEach(PerformanceTask.allCases) { Text($0.title).tag($0.rawValue) }
             }
-            .frame(width: 280)
+            .flexibleWidth(280)
             if list.isEmpty {
                 EmptyPanel(icon: "clock", title: "No runs yet", message: "Run a maintenance task and it will be recorded here.",
                            actionTitle: "Open Maintenance") { nav.push(.performance(.maintenance)) }

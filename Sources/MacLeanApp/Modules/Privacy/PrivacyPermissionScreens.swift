@@ -66,7 +66,7 @@ struct PrivacyPermissionsScreen: View {
                     Text("By service").tag(false)
                     Text("By app").tag(true)
                 }
-                .pickerStyle(.segmented).frame(width: 240).labelsHidden()
+                .pickerStyle(.segmented).flexibleWidth(240).labelsHidden()
                 if showApps {
                     Card("Apps", trailing: "\(clients.count)") {
                         ForEach(clients, id: \.client) { entry in

@@ -75,7 +75,7 @@ struct PerformanceStartupListScreen: View {
                     ForEach(PerformanceStartupSort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 240)
+                .flexibleWidth(240)
                 Spacer()
                 Text("\(Format.count(items.count)) shown").font(Type.mono(10)).foregroundStyle(Theme.faint)
             }

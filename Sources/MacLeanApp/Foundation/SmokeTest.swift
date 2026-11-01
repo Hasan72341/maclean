@@ -166,12 +166,12 @@ enum SmokeTest {
         let env = ProcessInfo.processInfo.environment
         let dwell = Double(env["MACLEAN_SMOKE_DWELL"] ?? "") ?? 2
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1240, height: 800),
+            contentRect: NSRect(x: 0, y: 0, width: smokeSize.width, height: smokeSize.height),
             styleMask: [.titled, .resizable],
             backing: .buffered,
             defer: false
         )
-        window.contentView = NSHostingView(rootView: RootShell(smoke: true).frame(width: 1240, height: 800))
+        window.contentView = NSHostingView(rootView: RootShell(smoke: true).frame(width: smokeSize.width, height: smokeSize.height))
         window.orderFrontRegardless()
         var log = ""
         Task { @MainActor in
@@ -244,6 +244,69 @@ enum SmokeTest {
                     panel.orderOut(nil)
                 }
                 try? log.write(to: directory.appendingPathComponent("progress.log"), atomically: true, encoding: .utf8)
+            }
+            if env["MACLEAN_SMOKE_RESCUE"] != nil {
+                // A file the user cannot delete: it sits in a read-only folder.
+                let base = FileManager.default.temporaryDirectory.appendingPathComponent("maclean-rescue-\(UUID().uuidString)")
+                let locked = base.appendingPathComponent("Locked Leftovers")
+                try? FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+                let victim = locked.appendingPathComponent("com.example.helper.plist")
+                try? Data("x".utf8).write(to: victim)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: locked.path)
+                var summary = RemovalSummary()
+                do { try FileManager.default.removeItem(at: victim) } catch { summary.failures = [(victim.path, error.localizedDescription)] }
+                summary.failures.append(("/System/Library/CoreServices/Finder.app", "Operation not permitted"))
+                _ = ActivityLog.shared.record("Apps", "Remove leftovers", summary)
+                let rescue = RemovalRescue.shared
+                var rlog = "rescue: offered=\(rescue.isPresented) items=\(rescue.items.count) elevatable=\(rescue.elevatable.count)\n"
+                @MainActor func render(_ name: String) {
+                    for (suffix, appearance) in [("light", NSAppearance.Name.aqua), ("dark", NSAppearance.Name.darkAqua)] {
+                        let host = NSHostingView(rootView: RemovalRescueSheet())
+                        let panel = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 640, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
+                        panel.appearance = NSAppearance(named: appearance)
+                        panel.contentView = host
+                        host.setFrameSize(NSSize(width: 640, height: host.fittingSize.height))
+                        panel.setContentSize(NSSize(width: 640, height: host.fittingSize.height))
+                        panel.orderFront(nil)
+                        index += 1
+                        snapshot(panel, to: directory.appendingPathComponent(String(format: "%03d-rescue-\(name)-\(suffix).png", index)))
+                        panel.orderOut(nil)
+                    }
+                }
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                render("offer")
+                // Unlock so the (non-elevated, test-mode) retry can succeed for one item…
+                rescue.retryAsAdministrator()
+                for _ in 0..<40 where rescue.stage == .running { try? await Task.sleep(nanoseconds: 250_000_000) }
+                rlog += "rescue after retry (locked): stage=\(rescue.stage) left=\(rescue.items.map(\.path))\n"
+                render("failed")
+                rescue.dismiss()
+                try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path)
+                try? FileManager.default.removeItem(at: base)
+                try? (log + rlog).write(to: directory.appendingPathComponent("progress.log"), atomically: true, encoding: .utf8)
+                log += rlog
+            }
+            if env["MACLEAN_SMOKE_SELECTBAR"] != nil {
+                let bars = VStack(alignment: .leading, spacing: 14) {
+                    ForEach([(0, 0), (12, 2_400_000_000), (48, 9_100_000_000)], id: \.0) { state in
+                        SelectionBar(selectedCount: state.0, totalCount: 48, selectedBytes: Int64(state.1), actionTitle: "Remove Leftovers",
+                                     onSelectAll: {}, onSelectNone: {}, action: {})
+                    }
+                    Text("narrow").font(Type.mono(10)).foregroundStyle(Theme.muted)
+                    SelectionBar(selectedCount: 12, totalCount: 48, selectedBytes: 2_400_000_000, actionTitle: "Remove Leftovers",
+                                 onSelectAll: {}, onSelectNone: {}, action: {})
+                        .frame(width: 380)
+                }
+                .padding(20).frame(width: 760).background(Theme.paper)
+                let host = NSHostingView(rootView: bars)
+                let panel = NSWindow(contentRect: NSRect(x: 80, y: 80, width: 760, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+                panel.contentView = host
+                panel.setContentSize(host.fittingSize)
+                panel.orderFront(nil)
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                index += 1
+                snapshot(panel, to: directory.appendingPathComponent(String(format: "%03d-selectbar.png", index)))
+                panel.orderOut(nil)
             }
             if env["MACLEAN_SMOKE_LENS_DISK"] != nil {
                 let store = LensStore.shared
@@ -559,6 +622,15 @@ enum SmokeTest {
         store.forget(path)
         try? fm.removeItem(at: root)
         return out
+    }
+
+    /// MACLEAN_SMOKE_SIZE=WxH (default 1240x800); MACLEAN_SMOKE_SCALE=1.2 sets the interface size.
+    static var smokeSize: CGSize {
+        if let raw = ProcessInfo.processInfo.environment["MACLEAN_SMOKE_SCALE"], let value = Double(raw) {
+            InterfaceScale.current = CGFloat(value)
+        }
+        let parts = (ProcessInfo.processInfo.environment["MACLEAN_SMOKE_SIZE"] ?? "").split(separator: "x").compactMap { Double($0) }
+        return parts.count == 2 ? CGSize(width: parts[0], height: parts[1]) : CGSize(width: 1240, height: 800)
     }
 
     static func snapshot(_ window: NSWindow, to url: URL) {

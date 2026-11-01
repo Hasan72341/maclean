@@ -13,6 +13,9 @@ struct ScreenScaffold<Actions: View, Content: View>: View {
     @ViewBuilder var actions: () -> Actions
     @ViewBuilder var content: () -> Content
     @EnvironmentObject private var nav: Navigator
+    @Environment(\.isCompactWidth) private var compact
+
+    private var hPad: CGFloat { compact ? 16 : 28 }
 
     init(
         _ title: String,
@@ -36,15 +39,15 @@ struct ScreenScaffold<Actions: View, Content: View>: View {
             Hairline()
             if scrolls {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) { content() }
-                        .padding(.horizontal, 28)
-                        .padding(.vertical, 22)
+                    VStack(alignment: .leading, spacing: compact ? 14 : 20) { content() }
+                        .padding(.horizontal, hPad)
+                        .padding(.vertical, compact ? 14 : 22)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 16) { content() }
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 18)
+                    .padding(.horizontal, hPad)
+                    .padding(.vertical, compact ? 12 : 18)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
         }
@@ -81,26 +84,42 @@ struct ScreenScaffold<Actions: View, Content: View>: View {
                     SystemSettingsLink(pane: pane)
                 }
             }
-            HStack(alignment: .bottom, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(Type.display(28))
-                        .foregroundStyle(Theme.ink)
-                        .lineLimit(1)
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(Type.text(12))
-                            .foregroundStyle(Theme.muted)
-                            .lineLimit(2)
-                    }
+            // Title and actions side by side; actions move under the title when narrow.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .bottom, spacing: 16) {
+                    titleBlock
+                    Spacer(minLength: 12)
+                    HStack(spacing: 8) { actions() }.fixedSize()
                 }
-                Spacer(minLength: 12)
-                HStack(spacing: 8) { actions() }
+                VStack(alignment: .leading, spacing: 10) {
+                    titleBlock
+                    ScrollView(.horizontal) {
+                        HStack(spacing: 8) { actions() }.fixedSize()
+                    }
+                    .scrollIndicators(.never)
+                }
             }
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 34)
-        .padding(.bottom, 14)
+        .padding(.horizontal, hPad)
+        .padding(.top, compact ? 30 : 34)
+        .padding(.bottom, compact ? 10 : 14)
+    }
+
+    private var titleBlock: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(Type.display(compact ? 23 : 28))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            if let subtitle {
+                Text(subtitle)
+                    .font(Type.text(12))
+                    .foregroundStyle(Theme.muted)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     private var breadcrumbs: some View {
@@ -199,7 +218,7 @@ struct TileGrid<Content: View>: View {
     }
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: minWidth), spacing: 12)], alignment: .leading, spacing: 12) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: min(minWidth * Type.scale, 260)), spacing: 12)], alignment: .leading, spacing: 12) {
             content()
         }
     }
@@ -645,25 +664,24 @@ struct SelectionBar: View {
     }
 
     var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("\(Format.count(selectedCount)) of \(Format.count(totalCount)) selected")
-                    .font(Type.text(12, weight: .medium)).foregroundStyle(Theme.ink)
-                Text(Format.bytes(selectedBytes))
-                    .font(Type.mono(11, weight: .semibold)).foregroundStyle(Theme.accent).monospacedDigit()
+        // Wide windows: one row. Narrow windows: the action drops to a second row.
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                selectAll
+                summary
+                Spacer(minLength: 8)
+                actionButton
             }
-            Button("All", action: onSelectAll).buttonStyle(EditorialButtonStyle(kind: .ghost))
-            Button("None", action: onSelectNone).buttonStyle(EditorialButtonStyle(kind: .ghost)).disabled(selectedCount == 0)
-            Spacer()
-            if busy { ProgressView().controlSize(.small) }
-            Button(actionTitle) { confirming = true }
-                .buttonStyle(EditorialButtonStyle(kind: .primary))
-                .disabled(selectedCount == 0 || busy)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 12) { selectAll; summary }
+                HStack { Spacer(); actionButton }
+            }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(RoundedRectangle(cornerRadius: 10).fill(Theme.canvas).shadow(color: .black.opacity(0.08), radius: 8, y: -1))
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.line))
+        .accessibilityElement(children: .contain)
         .confirmationDialog(actionTitle + "?", isPresented: $confirming) {
             Button("\(actionTitle) (\(Format.count(selectedCount))\(selectedBytes > 0 ? ", " + Format.bytes(selectedBytes) : ""))", role: .destructive, action: action)
             Button("Cancel", role: .cancel) {}
@@ -683,6 +701,96 @@ struct SelectionBar: View {
             case .selectNone: onSelectNone()
             }
         }
+    }
+}
+
+extension SelectionBar {
+    fileprivate var selectAll: some View {
+        SelectAllToggle(selected: selectedCount, total: totalCount, disabled: busy,
+                        onSelectAll: onSelectAll, onSelectNone: onSelectNone)
+    }
+
+    fileprivate var summary: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(selectedCount == 0 ? "Nothing selected" : "\(Format.count(selectedCount)) of \(Format.count(totalCount)) selected")
+                .font(Type.text(12, weight: .medium)).foregroundStyle(selectedCount == 0 ? Theme.muted : Theme.ink)
+                .lineLimit(1)
+            if selectedBytes > 0 {
+                Text(Format.bytes(selectedBytes))
+                    .font(Type.mono(11, weight: .semibold)).foregroundStyle(Theme.accent).monospacedDigit()
+            }
+        }
+        .fixedSize()
+    }
+
+    fileprivate var actionButton: some View {
+        HStack(spacing: 8) {
+            if busy { ProgressView().controlSize(.small) }
+            Button(actionTitle) { confirming = true }
+                .buttonStyle(EditorialButtonStyle(kind: .primary))
+                .disabled(selectedCount == 0 || busy)
+                .fixedSize()
+        }
+    }
+}
+
+/// A clearly visible tri-state "Select all" control: a bordered chip with a
+/// checkbox that shows none / some / all, the count, and toggles everything.
+struct SelectAllToggle: View {
+    let selected: Int
+    let total: Int
+    var disabled = false
+    var compact = false
+    var onSelectAll: () -> Void
+    var onSelectNone: () -> Void
+    @State private var hovering = false
+
+    private var all: Bool { total > 0 && selected >= total }
+    private var some: Bool { selected > 0 && !all }
+
+    var body: some View {
+        Button {
+            all ? onSelectNone() : onSelectAll()
+        } label: {
+            HStack(spacing: 7) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(selected > 0 ? Theme.accent : Color.clear)
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(selected > 0 ? Theme.accent : Theme.muted, lineWidth: 1.5)
+                    if selected > 0 {
+                        Image(systemName: all ? "checkmark" : "minus")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundStyle(Color.white)
+                    }
+                }
+                .frame(width: 16, height: 16)
+                Text(all ? "Deselect all" : "Select all")
+                    .font(Type.text(12, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                if !compact {
+                    Text(Format.count(total))
+                        .font(Type.mono(10, weight: .bold))
+                        .foregroundStyle(selected > 0 ? Theme.accent : Theme.muted)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(Capsule().fill((selected > 0 ? Theme.accent : Theme.muted).opacity(0.14)))
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(RoundedRectangle(cornerRadius: 7).fill(selected > 0 || hovering ? Theme.accent.opacity(0.10) : Theme.paper))
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(selected > 0 ? Theme.accent.opacity(0.7) : Theme.line, lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 7))
+            .fixedSize()
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled || total == 0)
+        .opacity(disabled || total == 0 ? 0.5 : 1)
+        .onHover { hovering = $0 }
+        .keyboardShortcut(compact ? nil : KeyboardShortcut("a", modifiers: [.command, .shift]))
+        .help(all ? "Deselect all \(total) items (⇧⌘A)" : (some ? "Select the remaining \(total - selected) items (⇧⌘A)" : "Select all \(total) items (⇧⌘A)"))
+        .accessibilityLabel(all ? "Deselect all" : "Select all \(total) items")
+        .accessibilityValue(all ? "all selected" : (some ? "\(selected) selected" : "none selected"))
     }
 }
 
@@ -764,12 +872,12 @@ struct SelectionDockView: View {
                         }
                     }
                     Rectangle().fill(Theme.line).frame(width: 1, height: 26)
-                    Button("Select all \(Format.count(entry.total))") { dock.send(.selectAll) }
-                        .buttonStyle(EditorialButtonStyle(kind: .ghost))
-                        .disabled(entry.selected == entry.total || entry.busy)
+                    SelectAllToggle(selected: entry.selected, total: entry.total, disabled: entry.busy, compact: true,
+                                    onSelectAll: { dock.send(.selectAll) }, onSelectNone: { dock.send(.selectNone) })
                     Button("Clear") { dock.send(.selectNone) }
-                        .buttonStyle(EditorialButtonStyle(kind: .ghost))
+                        .buttonStyle(EditorialButtonStyle(kind: .secondary))
                         .disabled(entry.busy)
+                        .fixedSize()
                     if entry.busy {
                         ProgressView().controlSize(.small)
                         Text("Working…").font(Type.text(11)).foregroundStyle(Theme.muted)

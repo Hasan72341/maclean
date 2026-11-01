@@ -16,6 +16,7 @@ struct SettingsGeneralScreen: View {
                 StatTile(label: "Trash now", value: store.trashBytes.map(Format.bytes) ?? "…", detail: "~/.Trash", icon: "trash.circle")
             }
 
+            InterfaceSizeCard()
             Card("Appearance", trailing: "saved to maclean.appearance") {
                 HStack(spacing: 12) {
                     ForEach(SettingsAppearance.allCases, id: \.self) { option in
@@ -294,21 +295,7 @@ struct SettingsFullDiskAccessScreen: View {
                 }
             }
 
-            Card("Grant access") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Open System Settings › Privacy & Security › Full Disk Access, enable MacLean (or the terminal running it), then press Re-check. Some changes take effect only after relaunching MacLean.")
-                        .font(Type.text(12)).foregroundStyle(Theme.muted)
-                    HStack(spacing: 10) {
-                        Button("Open System Settings") {
-                            if let url = URL(string: Self.settingsURL) { NSWorkspace.shared.open(url) }
-                        }
-                        .buttonStyle(EditorialButtonStyle(kind: .primary))
-                        Button("Re-check") { Task { await store.checkAccess() } }
-                        Button("Reveal MacLean") { EngineActions.reveal(Bundle.main.bundlePath) }
-                            .buttonStyle(EditorialButtonStyle(kind: .ghost))
-                    }
-                }
-            }
+            FullDiskAccessHelper()
             NavRow(icon: "questionmark.circle", title: "Permissions Guide", subtitle: "What each permission unlocks", route: .settings(.permissionsGuide))
         }
         .onAppear { store.loadAccessIfNeeded() }
@@ -365,5 +352,51 @@ struct SettingsPermissionsGuideScreen: View {
             NavRow(icon: "lock.shield", title: "Check Full Disk Access", route: .settings(.fullDiskAccess))
         }
         .onAppear { store.loadAccessIfNeeded() }
+    }
+}
+
+
+/// Interface size: scales every font and the layout with it, for small
+/// screens or large display scaling. Also ⌘+ / ⌘− / ⌘0.
+struct InterfaceSizeCard: View {
+    @ObservedObject private var scale = InterfaceScale.shared
+    @ObservedObject private var sidebar = SidebarState.shared
+    @Environment(\.windowWidth) private var windowWidth
+
+    var body: some View {
+        Card("Interface size", trailing: "⌘+  ⌘−  ⌘0") {
+            VStack(alignment: .leading, spacing: 12) {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 6) { buttons }
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 6)], alignment: .leading, spacing: 6) { buttons }
+                }
+                Text("Makes text and controls larger or smaller across MacLean, for small screens, high display scaling, or easier reading. The window keeps fitting your screen.")
+                    .font(Type.text(11)).foregroundStyle(Theme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Text("Sidebar").font(Type.text(12)).foregroundStyle(Theme.ink)
+                    Spacer()
+                    Picker("", selection: Binding(
+                        get: { sidebar.userCollapsed.map { $0 ? 2 : 1 } ?? 0 },
+                        set: { sidebar.userCollapsed = $0 == 0 ? nil : ($0 == 2) }
+                    )) {
+                        Text("Automatic").tag(0)
+                        Text("Full").tag(1)
+                        Text("Icons only").tag(2)
+                    }
+                    .pickerStyle(.segmented).labelsHidden().flexibleWidth(300)
+                }
+                Text("Automatic shows icons only when the window is narrow (⌃⌘S toggles).")
+                    .font(Type.text(11)).foregroundStyle(Theme.muted)
+            }
+        }
+    }
+
+    @ViewBuilder private var buttons: some View {
+        ForEach(InterfaceScale.steps, id: \.self) { step in
+            Button(InterfaceScale.label(step)) { scale.value = step }
+                .buttonStyle(EditorialButtonStyle(kind: abs(scale.value - step) < 0.01 ? .primary : .secondary))
+                .fixedSize()
+        }
     }
 }

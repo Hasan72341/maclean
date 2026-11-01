@@ -175,6 +175,8 @@ private struct LensPlaceTile: View {
 // MARK: - Lens explorer
 
 struct SpaceLensScreen: View {
+    @Environment(\.contentWidth) private var contentWidth
+    private var lensChartHeight: CGFloat { min(440, max(280, contentWidth * 0.5)) }
     let path: String
     @ObservedObject private var store = LensStore.shared
     @EnvironmentObject private var nav: Navigator
@@ -240,14 +242,14 @@ struct SpaceLensScreen: View {
             }
         }
 
-        HStack(alignment: .top, spacing: 16) {
+        AdaptiveStack(threshold: 860) {
             Card(nil, padding: 12) {
                 VStack(spacing: 10) {
                     HStack {
                         Picker("Chart", selection: $store.style) {
                             ForEach(LensChartStyle.allCases) { Label($0.rawValue, systemImage: $0.icon).tag($0) }
                         }
-                        .pickerStyle(.segmented).labelsHidden().frame(width: 290)
+                        .pickerStyle(.segmented).labelsHidden().flexibleWidth(290)
                         Spacer()
                         if item.parent != nil {
                             Button { if let parent = item.parent { LensStore.open(parent, nav: nav) } } label: { Label("Up", systemImage: "arrow.up") }
@@ -255,15 +257,15 @@ struct SpaceLensScreen: View {
                         }
                     }
                     chart(item)
-                        .frame(height: 440)
+                        .frame(height: lensChartHeight)
                         .id(item.path + store.style.rawValue)
                         .transition(.opacity.combined(with: .scale(scale: 0.97)))
                     LensHoverLine(item: hovered ?? item, parent: item, isHover: hovered != nil)
                 }
             }
-            .frame(minWidth: 420)
+            .frame(minWidth: 300)
             contents(item)
-                .frame(minWidth: 320, maxWidth: 460)
+                .frame(minWidth: 280, maxWidth: contentWidth >= 860 * Type.scale ? 460 : .infinity)
         }
         .animation(.easeInOut(duration: 0.2), value: item.path)
 

@@ -428,7 +428,7 @@ struct ProtectionRulesScreen: View {
                         Text("Most rules").tag(true)
                         Text("Name").tag(false)
                     }
-                    .pickerStyle(.segmented).frame(width: 200)
+                    .pickerStyle(.segmented).flexibleWidth(200)
                 }
                 Card("Files", trailing: "\(list.count)") {
                     ForEach(list) { file in

@@ -175,6 +175,9 @@ final class ActivityLog: ObservableObject {
     func record(_ module: String, _ title: String, _ summary: RemovalSummary, detail: String = "") -> RemovalSummary {
         add(ActivityEntry(module: module, title: title, items: summary.removed, bytes: summary.bytes, failures: summary.failures.count, detail: detail))
         ToastCenter.shared.show("\(title): \(summary.message)", error: !summary.failures.isEmpty && summary.removed == 0)
+        if !summary.failures.isEmpty {
+            RemovalRescue.shared.offer(module: module, title: title, failures: summary.failures)
+        }
         return summary
     }
 

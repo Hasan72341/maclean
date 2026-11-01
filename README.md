@@ -33,7 +33,34 @@ updates MacLean.
 Because the signature is made locally, macOS treats each install as a new app, so
 Full Disk Access has to be granted again after an update.
 
-### Updates
+### When something can't be deleted
+
+If a removal leaves items behind (root-owned leftovers, locked files), MacLean lists
+them with the exact path and the reason. For each one you can:
+
+1. **Try as Administrator.** macOS asks for your password. The items move to your
+   Trash and are owned by you again, so the Trash can be emptied. Launch items are
+   unloaded first.
+2. **Remove it yourself.** If something still remains, use **Copy path**,
+   **Show in Finder**, or the ready-made `sudo rm` commands.
+
+MacLean never offers the administrator retry or the commands for paths it refuses
+on purpose: macOS system files, protected folders such as `~/Documents`,
+keychains, and symbolic links.
+
+## Screen sizes and interface size
+
+The window fits any screen, down to 760×520. The sidebar collapses to icons when
+the window is narrow (⌃⌘S toggles it). To make everything larger or smaller, use
+Settings › General › Interface size (85–130%) or ⌘+ / ⌘− / ⌘0.
+
+## Full Disk Access
+
+MacLean isn't in the Full Disk Access list until you add it, because macOS doesn't
+let apps add themselves. Settings › Full Disk Access has a MacLean tile you can drag
+into the list. It then re-checks by itself until access works.
+
+## Updates
 
 MacLean checks GitHub releases at launch and every 6 hours. You can turn this off
 in Settings › About & Updates.

@@ -119,7 +119,7 @@ struct AppsListScreen: View {
                     ForEach(AppsSort.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 320)
+                .flexibleWidth(320)
             }
 
             if let summary {

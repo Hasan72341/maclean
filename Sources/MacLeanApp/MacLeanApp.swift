@@ -176,11 +176,25 @@ struct MacLeanApp: App {
     var body: some Scene {
         WindowGroup("MacLean", id: "main") {
             RootShell()
-                .frame(minWidth: 1100, minHeight: 720)
+                .frame(minWidth: 760, minHeight: 520)
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 1240, height: 800)
+        .defaultSize(WindowFitter.preferredSize())
         .commands {
+            CommandGroup(after: .toolbar) {
+                Button("Bigger Interface") { InterfaceScale.shared.bigger() }
+                    .keyboardShortcut("+", modifiers: .command)
+                Button("Smaller Interface") { InterfaceScale.shared.smaller() }
+                    .keyboardShortcut("-", modifiers: .command)
+                Button("Actual Size") { InterfaceScale.shared.reset() }
+                    .keyboardShortcut("0", modifiers: .command)
+                Divider()
+                Button("Toggle Sidebar") {
+                    let width = NSApp.keyWindow?.frame.width ?? 1200
+                    SidebarState.shared.toggle(windowWidth: width)
+                }
+                .keyboardShortcut("s", modifiers: [.command, .control])
+            }
             // MacLean › Settings… (⌘,) opens MacLean's own Settings section.
             CommandGroup(replacing: .appSettings) {
                 Button("Settings…") { Navigator.shared.go(.settings) }

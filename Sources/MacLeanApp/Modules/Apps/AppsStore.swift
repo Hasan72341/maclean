@@ -53,6 +53,14 @@ final class AppsStore: ObservableObject {
     private var iconCache: [String: NSImage] = [:]
 
     init() {
+        // Items removed later with administrator rights: refresh what is listed.
+        NotificationCenter.default.publisher(for: .macleanAdminRemoved)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] note in
+                let paths = note.object as? [String] ?? []
+                Task { @MainActor in self?.refreshAfterRemoval(appRemoved: paths.contains { $0.hasSuffix(".app") }) }
+            }
+            .store(in: &cancellables)
         SystemMonitor.shared.start()
         SystemMonitor.shared.$processes
             .receive(on: RunLoop.main)

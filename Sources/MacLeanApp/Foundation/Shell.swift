@@ -9,10 +9,31 @@ struct RootShell: View {
     @StateObject private var activity = ActivityLog.shared
     @StateObject private var toasts = ToastCenter.shared
     @ObservedObject private var updater = Updater.shared
+    @ObservedObject private var rescue = RemovalRescue.shared
+    @ObservedObject private var scale = InterfaceScale.shared
+    @ObservedObject private var sidebar = SidebarState.shared
 
     var body: some View {
+        GeometryReader { proxy in
+            let collapsed = sidebar.collapsed(windowWidth: proxy.size.width)
+            let sidebarWidth: CGFloat = collapsed ? 64 : 232 * min(1.15, max(0.9, Type.scale))
+            shell(collapsed: collapsed)
+                .environment(\.contentWidth, max(320, proxy.size.width - sidebarWidth - 1))
+                .environment(\.sidebarWidth, sidebarWidth)
+                .environment(\.windowWidth, proxy.size.width)
+        }
+        // Rebuild every view when the interface size changes (fonts are computed).
+        .id(scale.value)
+        .background(WindowAccessor { window in
+            WindowFitter.fit(window)
+            window.minSize = NSSize(width: 760, height: 520)
+        })
+    }
+
+    @ViewBuilder
+    private func shell(collapsed: Bool) -> some View {
         HStack(spacing: 0) {
-            ShellSidebar()
+            ShellSidebar(collapsed: collapsed)
             Rectangle().fill(Theme.line).frame(width: 1)
             VStack(spacing: 0) {
                 ZStack {
@@ -35,6 +56,7 @@ struct RootShell: View {
                 .animation(.easeOut(duration: 0.15), value: nav.section)
                 LiveStatusStrip()
             }
+            .sheet(isPresented: $rescue.isPresented) { RemovalRescueSheet() }
             .background(Theme.paper)
         }
         .background(Theme.paper)
@@ -65,8 +87,12 @@ struct RootShell: View {
 }
 
 private struct ShellSidebar: View {
+    var collapsed = false
     @EnvironmentObject private var nav: Navigator
     @EnvironmentObject private var monitor: SystemMonitor
+    @Environment(\.sidebarWidth) private var width
+    @Environment(\.windowWidth) private var windowWidth
+    @ObservedObject private var sidebar = SidebarState.shared
 
     private var groups: [(String, [AppSection])] {
         var result: [(String, [AppSection])] = []
@@ -81,12 +107,73 @@ private struct ShellSidebar: View {
     }
 
     var body: some View {
+        if collapsed { rail } else { full }
+    }
+
+    private var toggleButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) { sidebar.toggle(windowWidth: windowWidth) }
+        } label: {
+            Image(systemName: "sidebar.left")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.muted)
+                .frame(width: 26, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(collapsed ? "Show the sidebar (⌃⌘S)" : "Collapse the sidebar (⌃⌘S)")
+    }
+
+    /// Narrow windows: icons only.
+    private var rail: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text("m").font(Type.display(24, weight: .semibold)).foregroundStyle(Theme.ink)
+                Text(".").font(Type.display(24, weight: .semibold)).foregroundStyle(Theme.accent)
+            }
+            .padding(.top, 40)
+            toggleButton.padding(.vertical, 8)
+            ScrollView {
+                VStack(spacing: 4) {
+                    ForEach(groups, id: \.0) { group in
+                        Rectangle().fill(Theme.line).frame(width: 24, height: 1).padding(.vertical, 6)
+                        ForEach(group.1) { section in
+                            let selected = nav.section == section
+                            Button {
+                                if selected { nav.popToRoot() } else { nav.section = section }
+                            } label: {
+                                Image(systemName: section.icon)
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(selected ? Theme.accent : Theme.muted)
+                                    .frame(width: 40, height: 34)
+                                    .background(RoundedRectangle(cornerRadius: 8).fill(selected ? Theme.accent.opacity(0.14) : .clear))
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .help(section.title)
+                            .accessibilityLabel(section.title)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .padding(.bottom, 10)
+        }
+        .frame(width: width)
+        .background(Theme.canvas)
+    }
+
+    private var full: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text("maclean").font(Type.display(26)).foregroundStyle(Theme.ink)
                 Text(".").font(Type.display(26)).foregroundStyle(Theme.accent)
+                Spacer()
+                toggleButton.alignmentGuide(.firstTextBaseline) { $0[.bottom] - 4 }
             }
-            .padding(.horizontal, 20)
+            .padding(.leading, 20)
+            .padding(.trailing, 10)
             .padding(.top, 44)
             .padding(.bottom, 16)
 
@@ -129,7 +216,7 @@ private struct ShellSidebar: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 18)
         }
-        .frame(width: 232)
+        .frame(width: width)
         .background(Theme.canvas)
     }
 }
@@ -209,31 +296,44 @@ private struct LiveStatusStrip: View {
     @EnvironmentObject private var activity: ActivityLog
 
     var body: some View {
+        // Drops the least important readings first as the window narrows.
+        ViewThatFits(in: .horizontal) {
+            strip(level: 3)
+            strip(level: 2)
+            strip(level: 1)
+            strip(level: 0)
+        }
+        .padding(.horizontal, 20)
+        .frame(height: 28 * max(1, Type.scale))
+        .background(Theme.canvas)
+        .overlay(alignment: .top) { Hairline() }
+    }
+
+    private func strip(level: Int) -> some View {
         let s = monitor.latest
-        HStack(spacing: 18) {
+        return HStack(spacing: 18) {
             stat("CPU", String(format: "%.0f%%", s.cpu.total * 100))
-            stat("MEM", "\(Format.bytes(s.memory.used)) / \(Format.bytes(s.memory.total))")
+            stat("MEM", level >= 2 ? "\(Format.bytes(s.memory.used)) / \(Format.bytes(s.memory.total))" : Format.bytes(s.memory.used))
             stat("FREE", Format.bytes(s.disk.available))
-            stat("↓", Format.rate(s.network.rxPerSec))
-            stat("↑", Format.rate(s.network.txPerSec))
-            if let battery = s.battery {
+            if level >= 1 {
+                stat("↓", Format.rate(s.network.rxPerSec))
+                stat("↑", Format.rate(s.network.txPerSec))
+            }
+            if level >= 2, let battery = s.battery {
                 stat("BAT", "\(battery.percent)%\(battery.isCharging ? " ⚡︎" : "")")
             }
-            Spacer()
-            if let last = activity.entries.first {
+            Spacer(minLength: 12)
+            if level >= 3, let last = activity.entries.first {
                 Text("LAST: \(last.title) · \(Format.bytes(last.bytes))")
                     .font(Type.mono(9))
                     .foregroundStyle(Theme.faint)
                     .lineLimit(1)
             }
-            Text("FREED TOTAL \(Format.bytes(activity.totalFreed))")
+            Text(level >= 1 ? "FREED TOTAL \(Format.bytes(activity.totalFreed))" : "FREED \(Format.bytes(activity.totalFreed))")
                 .font(Type.mono(9, weight: .semibold))
                 .foregroundStyle(Theme.success)
+                .fixedSize()
         }
-        .padding(.horizontal, 20)
-        .frame(height: 28)
-        .background(Theme.canvas)
-        .overlay(alignment: .top) { Hairline() }
     }
 
     private func stat(_ label: String, _ value: String) -> some View {
@@ -241,6 +341,7 @@ private struct LiveStatusStrip: View {
             Text(label).font(Type.mono(9, weight: .semibold)).foregroundStyle(Theme.faint)
             Text(value).font(Type.mono(10)).foregroundStyle(Theme.ink).monospacedDigit()
         }
+        .fixedSize()
     }
 }
 

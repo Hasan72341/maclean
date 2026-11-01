@@ -144,7 +144,7 @@ struct CleanupItemList: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 210)
+                .flexibleWidth(210)
             }
             SelectionBar(
                 selectedCount: selected.count,

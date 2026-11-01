@@ -615,7 +615,7 @@ struct ProtectionUniversalScreen: View {
                     Picker("", selection: $sort) {
                         ForEach(ProtectionUniversalSort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
-                    .pickerStyle(.segmented).frame(width: 240)
+                    .pickerStyle(.segmented).flexibleWidth(240)
                 }
                 Card("Top savings") {
                     ForEach(all.sorted { $0.estimatedSavings > $1.estimatedSavings }.prefix(6)) { item in
