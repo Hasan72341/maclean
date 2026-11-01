@@ -34,7 +34,7 @@ struct AppsOverviewScreen: View {
                         let top = Array(apps.prefix(10))
                         let maxBytes = Double(top.first?.bytes ?? 1)
                         ForEach(top) { app in
-                            BarRow(label: app.name, value: Double(app.bytes), total: maxBytes, valueText: Format.bytes(app.bytes)) {
+                            BarRow(label: app.name, value: Double(app.bytes), total: maxBytes, valueText: Format.bytes(app.bytes), iconPath: app.path) {
                                 nav.push(.apps(.appDetail(app.path)))
                             }
                         }

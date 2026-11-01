@@ -28,7 +28,7 @@ updates MacLean.
 - Build on your own Mac instead: `curl -fsSL https://raw.githubusercontent.com/hasan72341/maclean/main/scripts/install.sh | bash -s -- --from-source`, or
   `git clone https://github.com/hasan72341/maclean && cd maclean && scripts/package-app.sh`
   (needs Xcode or the Command Line Tools; takes about 2 minutes).
-- Uninstall: `curl -fsSL https://raw.githubusercontent.com/hasan72341/maclean/main/scripts/install.sh | bash -s -- --uninstall` (add `--purge` to also remove settings and logs).
+- Uninstall: `curl -fsSL https://raw.githubusercontent.com/hasan72341/maclean/main/scripts/install.sh | bash -s -- --uninstall` removes MacLean and all its files (add `--keep-data` to keep settings and history).
 
 Because the signature is made locally, macOS treats each install as a new app, so
 Full Disk Access has to be granted again after an update.

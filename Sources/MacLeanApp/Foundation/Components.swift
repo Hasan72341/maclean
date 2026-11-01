@@ -414,10 +414,12 @@ struct BarRow: View {
     let total: Double
     var valueText: String
     var tint: Color = Theme.accent
+    /// Path of an app (or any file) whose Finder icon leads the row.
+    var iconPath: String? = nil
     var action: (() -> Void)? = nil
 
     var body: some View {
-        let content = VStack(alignment: .leading, spacing: 5) {
+        let bar = VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text(label).font(Type.text(12)).foregroundStyle(Theme.ink).lineLimit(1)
                 Spacer()
@@ -433,6 +435,10 @@ struct BarRow: View {
                 }
             }
             .frame(height: 6)
+        }
+        let content = HStack(spacing: 10) {
+            if let iconPath { AppsIcon(path: iconPath, size: 26) }
+            bar
         }
         .contentShape(Rectangle())
         if let action {

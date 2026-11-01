@@ -33,7 +33,7 @@ struct AppsRunningScreen: View {
                     let top = Array(regular.prefix(8))
                     let peak = Double(top.first?.memory ?? 1)
                     ForEach(top) { app in
-                        BarRow(label: app.name, value: Double(app.memory), total: peak, valueText: Format.bytes(app.memory), tint: Theme.info) {
+                        BarRow(label: app.name, value: Double(app.memory), total: peak, valueText: Format.bytes(app.memory), tint: Theme.info, iconPath: app.path) {
                             if let path = app.path, path.hasSuffix(".app") { nav.push(.apps(.appDetail(path))) }
                         }
                     }

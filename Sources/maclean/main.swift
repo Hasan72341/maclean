@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import MacLeanCore
 
-let version = "0.3.0"
+let version = "0.3.1"
 let stdoutIsTTY = isatty(STDOUT_FILENO) == 1
 
 struct CLIError: Error {

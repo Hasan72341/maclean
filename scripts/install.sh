@@ -6,8 +6,10 @@
 # Options (after `bash -s --`):
 #   --from-source   build on this Mac instead of downloading the app (needs Xcode
 #                   or the Command Line Tools; takes a couple of minutes)
-#   --uninstall     remove MacLean, its menu bar item and its background agent
-#   --purge         with --uninstall, also delete settings, saved maps and logs
+#   --uninstall     remove MacLean and everything it left on this Mac: the app,
+#                   menu bar item, background agent, caches, saved maps,
+#                   settings, alerts, logs and window state
+#   --keep-data     with --uninstall, keep settings, alerts and history
 #
 # No Apple Developer ID is involved: the app is signed on this Mac with a local
 # (ad-hoc) signature, so macOS runs it without a Gatekeeper prompt.
@@ -20,12 +22,13 @@ INSTALLER_URL="https://raw.githubusercontent.com/$REPO/main/scripts/install.sh"
 AGENT_LABEL="xyz.nyora.maclean.monitor"
 AGENT_PLIST="$HOME/Library/LaunchAgents/$AGENT_LABEL.plist"
 MODE="binary"
-PURGE=0
+KEEP_DATA=0
 for arg in "$@"; do
   case "$arg" in
     --from-source) MODE="source" ;;
     --uninstall) MODE="uninstall" ;;
-    --purge) PURGE=1 ;;
+    --keep-data) KEEP_DATA=1 ;;
+    --purge) ;; # older flag; removing everything is now the default
     -h|--help) sed -n '2,14p' "$0" 2>/dev/null || true; exit 0 ;;
   esac
 done
@@ -62,12 +65,23 @@ if [[ "$MODE" == "uninstall" ]]; then
   rm -f "$AGENT_PLIST"
   app="$(existing_app || true)"
   [[ -n "$app" ]] && rm -rf "$app" && step "Removed $app"
-  rm -f /usr/local/bin/maclean 2>/dev/null || true
-  rm -rf "$HOME/Library/Caches/MacLean" "$HOME/Library/Caches/maclean"
-  if (( PURGE )); then
-    rm -rf "$HOME/Library/Application Support/MacLean" "$HOME/Library/Logs/MacLeanMonitor."*
+  # The CLI link, only if it points at MacLean.
+  if [[ -L /usr/local/bin/maclean && "$(readlink /usr/local/bin/maclean)" == *MacLean.app* ]]; then
+    rm -f /usr/local/bin/maclean 2>/dev/null || step "Remove /usr/local/bin/maclean with sudo to finish"
+  fi
+  L="$HOME/Library"
+  rm -rf "$L/Caches/MacLean" "$L/Caches/maclean" "$L/Caches/xyz.nyora.maclean" \
+         "$L/HTTPStorages/xyz.nyora.maclean" "$L/HTTPStorages/xyz.nyora.maclean.binarycookies" \
+         "$L/WebKit/xyz.nyora.maclean" "$L/Saved Application State/xyz.nyora.maclean.savedState" \
+         "$L/Logs/MacLeanMonitor.out" "$L/Logs/MacLeanMonitor.err"
+  step "Removed caches, saved maps, logs and window state"
+  if (( KEEP_DATA )); then
+    step "Kept settings and history in $L/Application Support/MacLean"
+  else
     defaults delete xyz.nyora.maclean >/dev/null 2>&1 || true
-    step "Removed settings, alerts and logs"
+    rm -rf "$L/Application Support/MacLean" "$L/Preferences/xyz.nyora.maclean.plist" \
+           "$L/Preferences/ByHost/xyz.nyora.maclean."*.plist
+    step "Removed settings, alerts and history"
   fi
   printf "%sDone.%s\n" "$bold" "$reset"
   exit 0

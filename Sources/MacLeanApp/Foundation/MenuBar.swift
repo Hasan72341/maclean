@@ -319,6 +319,11 @@ struct MenuBarPanel: View {
             }
             ForEach(top) { process in
                 HStack(spacing: 8) {
+                    if let bundle = NSRunningApplication(processIdentifier: process.pid)?.bundleURL?.path {
+                        AppsIcon(path: bundle, size: 16)
+                    } else {
+                        Image(systemName: "gearshape").font(.system(size: 10)).foregroundStyle(Theme.faint).frame(width: 16, height: 16)
+                    }
                     Text(process.name).font(Type.text(11)).foregroundStyle(Theme.ink).lineLimit(1)
                     Spacer()
                     Text(String(format: "%.0f%%", process.cpu)).font(Type.mono(10, weight: .semibold)).foregroundStyle(process.cpu > 80 ? Theme.danger : Theme.ink)
