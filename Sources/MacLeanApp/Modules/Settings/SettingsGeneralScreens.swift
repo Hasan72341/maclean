@@ -226,8 +226,6 @@ struct SettingsAboutScreen: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("MacLean finds and removes junk, leftovers, caches, large and duplicate files, privacy traces and malware on macOS. Every removal is re-validated by the engine and goes to the Trash by default.")
                         .font(Type.text(13)).foregroundStyle(Theme.ink)
-                    Text("MacLean is an original clean-room implementation. It is not affiliated with, endorsed by, or derived from MacPaw or CleanMyMac.")
-                        .font(Type.text(12)).foregroundStyle(Theme.muted)
                 }
             }
             SoftwareUpdateCard()
