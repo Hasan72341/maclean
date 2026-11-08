@@ -618,7 +618,7 @@ struct CustomRuleEditorScreen: View {
                     Stepper(value: Binding(get: { draft.olderThanDays ?? 0 }, set: { draft.olderThanDays = $0 == 0 ? nil : $0 }), in: 0...3_650, step: 30) {
                         KeyValueRow(key: "Only files not modified for", value: (draft.olderThanDays ?? 0) == 0 ? "Any age" : "\(draft.olderThanDays ?? 0) days")
                     }
-                    Text("Uses the large-file threshold from Scan Options (\(CleanupStore.shared.settings.largeThresholdMB) MB).").font(Type.text(10)).foregroundStyle(Theme.faint)
+                    Text("Uses the large-file threshold from Scan Options (\(Format.megabytes(CleanupStore.shared.settings.largeThresholdMB))).").font(Type.text(10)).foregroundStyle(Theme.faint)
                 }
             }
             Card("Safety") {

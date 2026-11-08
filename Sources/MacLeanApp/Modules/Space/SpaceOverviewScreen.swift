@@ -72,7 +72,7 @@ struct SpaceOverviewScreen: View {
             SectionHeader(title: "Explore", detail: "Space Lens and file finders")
             TileGrid(minWidth: 280) {
                 NavRow(icon: "circle.hexagongrid", title: "Space Lens", subtitle: "Browse folders by size", value: Format.bytes(measuredTotal), route: .space(.lensHome))
-                NavRow(icon: "doc.badge.clock", title: "Large & Old Files", subtitle: "Files over \(store.largeMinMB) MB",
+                NavRow(icon: "doc.badge.clock", title: "Large & Old Files", subtitle: "Files over \(Format.megabytes(store.largeMinMB))",
                        value: store.largeState.loadedAt == nil ? nil : bytesOf(store.filteredLarge), route: .space(.largeOldFiles))
                 NavRow(icon: "square.on.square", title: "Duplicates", subtitle: "Identical files by content hash",
                        value: store.dupState.loadedAt == nil ? nil : Format.bytes(store.duplicates.reduce(0) { $0 + $1.wastedBytes }), route: .space(.duplicates))

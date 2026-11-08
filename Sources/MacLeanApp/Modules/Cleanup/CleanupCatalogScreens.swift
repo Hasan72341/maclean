@@ -13,8 +13,8 @@ struct CleanupOptionsScreen: View {
         } content: {
             TileGrid {
                 StatTile(label: "Categories", value: "\(store.settings.enabledCategories.count)/\(JunkCategory.allCases.count)")
-                StatTile(label: "Minimum size", value: store.settings.minSizeMB == 0 ? "Any" : "\(store.settings.minSizeMB) MB")
-                StatTile(label: "Large file", value: "≥ \(store.settings.largeThresholdMB) MB")
+                StatTile(label: "Minimum size", value: store.settings.minSizeMB == 0 ? "Any" : Format.megabytes(store.settings.minSizeMB))
+                StatTile(label: "Large file", value: "≥ " + Format.megabytes(store.settings.largeThresholdMB))
                 StatTile(label: "Removal", value: store.settings.permanent ? "Delete" : "Trash", tint: store.settings.permanent ? Theme.danger : Theme.success)
             }
             Card("Categories to scan") {
@@ -37,10 +37,10 @@ struct CleanupOptionsScreen: View {
             }
             Card("Thresholds") {
                 Stepper(value: $store.settings.minSizeMB, in: 0...10_000, step: 5) {
-                    KeyValueRow(key: "Ignore items smaller than", value: store.settings.minSizeMB == 0 ? "No minimum" : "\(store.settings.minSizeMB) MB")
+                    KeyValueRow(key: "Ignore items smaller than", value: store.settings.minSizeMB == 0 ? "No minimum" : Format.megabytes(store.settings.minSizeMB))
                 }
                 Stepper(value: $store.settings.largeThresholdMB, in: 50...50_000, step: 50) {
-                    KeyValueRow(key: "Large file threshold", value: "\(store.settings.largeThresholdMB) MB")
+                    KeyValueRow(key: "Large file threshold", value: Format.megabytes(store.settings.largeThresholdMB))
                 }
                 Text("Applies to the next scan.").font(Type.text(11)).foregroundStyle(Theme.faint)
             }

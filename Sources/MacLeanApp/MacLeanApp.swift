@@ -145,6 +145,13 @@ enum Format {
         return formatter.string(fromByteCount: value)
     }
 
+    /// A size setting given in MB: "500 MB", "1 GB", "2.5 GB".
+    static func megabytes(_ mb: Int) -> String {
+        guard mb >= 1000 else { return "\(mb) MB" }
+        let gb = (Double(mb) / 1000 * 100).rounded() / 100
+        return gb == gb.rounded() ? "\(Int(gb)) GB" : "\(gb) GB"
+    }
+
     static func bytes(_ value: UInt64) -> String {
         bytes(Int64(clamping: value))
     }
