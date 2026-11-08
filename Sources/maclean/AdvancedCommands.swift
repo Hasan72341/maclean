@@ -329,6 +329,31 @@ func diskImagesCommand(_ args: ParsedArgs) throws -> Int32 {
     return run.result.failed.isEmpty ? 0 : 1
 }
 
+func purgeCommand(_ args: ParsedArgs) throws -> Int32 {
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    let minBytes = try parseMinBytes(args)
+    guard let recentDays = Int(args.values["--recent-days"]?.last ?? "7"), recentDays >= 0 else {
+        throw CLIError("--recent-days expects a non-negative number of days", code: 2)
+    }
+    let roots = args.values["--path"].map { paths in
+        paths.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath).standardizedFileURL }
+    }
+    let artifacts = ProjectArtifactScanner.scan(
+        home: home,
+        roots: roots,
+        recentDays: recentDays,
+        minBytes: minBytes
+    )
+    let run = try runArtifacts(artifacts, args: args, home: home)
+
+    if args.flags.contains("--json") {
+        try printJSON(artifactPayload(title: "Project build files", artifacts: artifacts, run: run))
+    } else {
+        printArtifactRun(title: "Project build files", artifacts: artifacts, run: run, home: home)
+    }
+    return run.result.failed.isEmpty ? 0 : 1
+}
+
 func performanceCommand(_ args: ParsedArgs) throws -> Int32 {
     let home = FileManager.default.homeDirectoryForCurrentUser
 

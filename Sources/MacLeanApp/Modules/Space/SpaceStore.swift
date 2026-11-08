@@ -45,6 +45,12 @@ final class SpaceStore: ObservableObject {
     @Published var diskImageAgeDays: Int = 30
     @Published var diskImageMinMB: Int = 100
 
+    // Project build files
+    @Published private(set) var projectArtifacts: [Artifact] = []
+    @Published private(set) var projectArtifactsState: LoadState = .idle
+    @Published var projectRecentDays: Int = 7
+    @Published var projectMinMB: Int = 0
+
     // Downloads
     @Published private(set) var downloads: [SpaceFile] = []
     @Published private(set) var downloadsState: LoadState = .idle
@@ -248,6 +254,27 @@ final class SpaceStore: ObservableObject {
         let minBytes = Int64(diskImageMinMB) * 1_048_576
         diskImages = await engine { DiskImageScanner.scan(olderThanDays: age, minBytes: minBytes) }
         diskImagesState = .loaded(Date())
+    }
+
+    // MARK: - Project build files
+
+    func scanProjectArtifacts() async {
+        let key = "projects"
+        projectArtifactsState = .loading("Looking for project build folders…")
+        let (p, poll) = begin(key)
+        let recent = projectRecentDays
+        let minBytes = Int64(projectMinMB) * 1_048_576
+        let found = await engine {
+            ProjectArtifactScanner.scan(
+                recentDays: recent,
+                minBytes: minBytes,
+                progress: { p.tick($0, matched: $1) },
+                isCancelled: { p.isCancelled }
+            )
+        }
+        end(key, p, poll)
+        projectArtifacts = found
+        projectArtifactsState = .loaded(Date())
     }
 
     // MARK: - Downloads
@@ -515,6 +542,7 @@ final class SpaceStore: ObservableObject {
         archives.removeAll { gone($0.path) }
         trash.removeAll { gone($0.path) }
         diskImages.removeAll { gone($0.path) }
+        projectArtifacts.removeAll { gone($0.path) }
         mail.removeAll { gone($0.path) }
 
         duplicates = duplicates.compactMap { g in

@@ -134,7 +134,7 @@ sections. Every section keeps its own back stack (Back button, breadcrumbs,
 - **Performance** — startup items/agents/daemons/login items with disable/remove,
   snapshots, memory, heavy consumers, and maintenance tasks with live output
 - **Space & Files** — Space Lens drill-down, large & old files, duplicates, similar
-  images, disk images, downloads, file types, cloud, mail attachments, empty folders
+  images, disk images, project build files, downloads, file types, cloud, mail attachments, empty folders
 - **Protection** — scan profiles, findings, quarantine vault, realtime monitor and
   alerts, YARA rules, corpus, and Deep Scan (Mail Trash, Photos duplicates, document
   versions, deleted users, system caches, universal binaries)
@@ -393,6 +393,7 @@ test the app afterward.
 | `documentversions` | Document versions via Spotlight discovery + NSFileVersion |
 | `deep` | All protected-store modules in one report |
 | `diskimages` | Old, large `.dmg`/`.iso`/`.sparseimage` files |
+| `purge` | Rebuildable project folders: `node_modules`, Cargo `target`, SwiftPM `.build`, `.next`, `Pods`, Gradle `build`, virtualenvs… |
 | `cloud` | Local Dropbox/OneDrive/Google Drive/iCloud usage and large files |
 | `updates` | Pending macOS updates (`softwareupdate -l`) |
 | `protection` | Security audit using the six `PANScanConfiguration`-equivalent profiles |
@@ -433,6 +434,8 @@ maclean duplicates --path ~/Pictures --similar-images
 maclean lens ~/Library --depth 2 --top 10
 maclean mail --include-caution --apply --yes
 maclean diskimages --older-than 60 --min-size 200
+maclean purge                          # dry run over ~/Projects, ~/Developer, ~/Code, ~/Desktop…
+maclean purge --path ~/work --recent-days 30 --apply --yes
 maclean cloud --min-size 500
 maclean updates
 maclean protection --profile protected
@@ -547,7 +550,7 @@ Corpus YARA behavior:
 ## Safety model
 
 - **Read-only scanning.** `scan`, `privacy`, `performance`, `duplicates`,
-  `lens`, `mail`, `diskimages`, `cloud`, `updates` and `apps` do not modify
+  `lens`, `mail`, `diskimages`, `purge`, `cloud`, `updates` and `apps` do not modify
   anything without an explicit apply flag.
 - **Apply needs confirmation.** Destructive actions require both `--apply` and
   `--yes` (or `--yes` alone for one-shot actions such as `--flush-dns`).
@@ -558,6 +561,13 @@ Corpus YARA behavior:
   root. A path must be strictly inside that root (or be the root itself for
   whole-directory rules), after `realpath(3)` canonicalization. Symlinks are
   refused.
+- **Project build folders.** `purge` only lists a folder next to the file that
+  creates it (`node_modules` beside `package.json`, `target` beside `Cargo.toml`,
+  `.venv` containing `pyvenv.cfg`). Folders holding Git-tracked files and nested
+  repositories are never listed. Projects active in the last 7 days
+  (`--recent-days`), folders Git doesn't ignore, and virtualenvs need
+  `--include-caution`. `/usr/bin/git` is only used when the Command Line Tools
+  are installed, so a scan never triggers their install prompt.
 - **Protected paths.** `/`, `/System`, `/Library`, `/Applications`, `/Users`,
   `/usr`, `/bin`, `/sbin`, `/etc`, `/private`, `/var`, `/opt`, `/Volumes`,
   `/cores`, `/dev` and the home directory itself are always refused.
@@ -711,6 +721,7 @@ Sources/MacLeanCore
   Lens.swift          Sized directory tree
   MailScanner.swift   Mail attachments
   DiskImages.swift    Old disk images
+  ProjectArtifacts.swift  Rebuildable project build folders (purge)
   Cloud.swift         Local cloud-folder inventory
   Updates.swift       softwareupdate wrapper
   ProtectionConfig.swift  PANScanConfiguration-equivalent profiles and options

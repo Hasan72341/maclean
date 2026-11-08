@@ -86,6 +86,8 @@ struct SpaceOverviewScreen: View {
                        value: store.archivesState.loadedAt == nil ? nil : bytesOf(store.archives), route: .space(.archives))
                 NavRow(icon: "opticaldiscdrive", title: "Disk Images", subtitle: "Unused dmg / iso",
                        value: store.diskImagesState.loadedAt == nil ? nil : Format.bytes(store.diskImages.reduce(0) { $0 + $1.bytes }), route: .space(.diskImages))
+                NavRow(icon: "hammer", title: "Project Build Files", subtitle: "node_modules, target, .build, Pods…",
+                       value: store.projectArtifactsState.loadedAt == nil ? nil : Format.bytes(store.projectArtifacts.reduce(0) { $0 + $1.bytes }), route: .space(.projectArtifacts))
                 NavRow(icon: "folder.badge.minus", title: "Empty Folders", subtitle: "Folders with nothing inside",
                        value: store.emptyState.loadedAt == nil ? nil : Format.count(store.emptyFolders.count), route: .space(.emptyFolders))
                 NavRow(icon: "icloud", title: "Cloud Storage", subtitle: "iCloud, Dropbox, Drive, OneDrive",

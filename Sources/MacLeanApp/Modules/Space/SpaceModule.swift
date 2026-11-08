@@ -14,6 +14,7 @@ enum SpaceRoute: Hashable {
     case similarImages
     case similarGroup(String)
     case diskImages
+    case projectArtifacts
     case downloads
     case downloadsBucket(String)
     case fileTypes
@@ -52,6 +53,7 @@ enum SpaceModule {
         case .similarImages: SpaceSimilarScreen()
         case .similarGroup(let key): SpaceSimilarGroupScreen(key: key)
         case .diskImages: SpaceDiskImagesScreen()
+        case .projectArtifacts: SpaceProjectArtifactsScreen()
         case .downloads: SpaceDownloadsScreen()
         case .downloadsBucket(let key): SpaceDownloadsBucketScreen(key: key)
         case .fileTypes: SpaceFileTypesScreen()
@@ -84,6 +86,7 @@ enum SpaceModule {
         case .similarImages: return "Similar Images"
         case .similarGroup: return "Similar Group"
         case .diskImages: return "Disk Images"
+        case .projectArtifacts: return "Project Build Files"
         case .downloads: return "Downloads"
         case .downloadsBucket(let key): return SpaceDownloadsKey.title(key)
         case .fileTypes: return "File Types"

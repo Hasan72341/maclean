@@ -27,7 +27,7 @@ struct ParsedArgs {
             "--depth", "--top", "--older-than", "--max-distance", "--profile",
             "--yara-rules", "--clamav-db", "--corpus", "--reason", "--unused-days",
             "--service", "--bundle", "--library", "--reset", "--include", "--thin",
-            "--archive", "--progress-file", "--owner",
+            "--archive", "--progress-file", "--owner", "--recent-days",
         ]
         var parsed = ParsedArgs()
         var index = 0
@@ -464,6 +464,8 @@ func printHelp() {
       maclean documentversions [--apply --yes] [--json]
       maclean diskimages [--min-size <MB>] [--older-than <days>]
                          [--apply --yes] [--permanent] [--include-caution] [--json]
+      maclean purge [--path <dir>]... [--recent-days <n>] [--min-size <MB>]
+                    [--apply --yes] [--permanent] [--include-caution] [--json]
       maclean cloud [--min-size <MB>] [--json]
       maclean updates [--json]
       maclean protection [--profile fast|default|smart|protected|protected-dirs|paranoid]
@@ -486,6 +488,13 @@ func printHelp() {
       trash    ~/.Trash and mounted volume Trash bins
       large    Files above 500 MB in Downloads, Desktop, Documents and Movies
 
+    PURGE
+      Finds node_modules, Cargo target, SwiftPM .build, .next, Pods, Gradle and other
+      rebuildable project folders under ~/Projects, ~/Developer, ~/Code, ~/GitHub,
+      ~/Desktop, ~/Documents and similar (or --path). Folders with Git-tracked files and
+      nested repositories are never listed. Projects active in the last --recent-days
+      (default 7) and folders Git doesn't ignore need --include-caution.
+
     SAFETY
       scan never modifies anything.
       clean is a dry run unless --apply --yes is passed.
@@ -499,6 +508,7 @@ func printHelp() {
       maclean clean
       maclean clean --apply --yes
       maclean clean --category system --apply --yes --permanent
+      maclean purge --path ~/Projects
       maclean scan --json | jq '.items[0]'
     """)
 }
@@ -540,6 +550,8 @@ func run(_ raw: [String]) throws {
         code = try mailCommand(args)
     case "diskimages":
         code = try diskImagesCommand(args)
+    case "purge":
+        code = try purgeCommand(args)
     case "cloud":
         code = try cloudCommand(args)
     case "updates":

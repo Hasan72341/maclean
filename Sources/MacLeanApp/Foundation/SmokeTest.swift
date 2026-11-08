@@ -112,6 +112,7 @@ enum SmokeTest {
         (.space, .space(.duplicates)),
         (.space, .space(.similarImages)),
         (.space, .space(.diskImages)),
+        (.space, .space(.projectArtifacts)),
         (.space, .space(.downloads)),
         (.space, .space(.fileTypes)),
         (.space, .space(.extensions)),

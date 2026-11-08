@@ -46,6 +46,67 @@ struct SpaceDiskImagesScreen: View {
     }
 }
 
+// MARK: - Project build files
+
+struct SpaceProjectArtifactsScreen: View {
+    @ObservedObject private var store = SpaceStore.shared
+
+    var body: some View {
+        let items = store.projectArtifacts
+        let files = items.map(SpaceFile.from)
+        let preselected = Set(items.filter(\.autoselect).map(\.path))
+        let loading = store.projectArtifactsState.isLoading
+        ScreenScaffold("Project Build Files", subtitle: "Rebuildable dependencies and build output in your code folders") {
+            Card {
+                HStack(spacing: 18) {
+                    SpaceChips(label: "Skip active in", options: [(0, "None"), (7, "7 d"), (30, "30 d"), (90, "90 d")], value: $store.projectRecentDays)
+                    SpaceChips(label: "Min size", options: [(0, "Any"), (10, "10 MB"), (100, "100 MB"), (500, "500 MB")], value: $store.projectMinMB)
+                    Spacer()
+                    if loading {
+                        Button("Stop") { store.cancel("projects") }.buttonStyle(EditorialButtonStyle(kind: .secondary))
+                    } else {
+                        Button("Scan") { Task { await store.scanProjectArtifacts() } }
+                            .buttonStyle(EditorialButtonStyle(kind: .primary))
+                    }
+                }
+            }
+            Text("Looks in ~/Projects, ~/Developer, ~/Code, ~/GitHub, ~/Desktop, ~/Documents and similar folders. A folder counts only next to the file that creates it (node_modules next to package.json). Folders with Git-tracked files and nested repositories are never listed. Recently active projects, folders Git doesn't ignore and Python virtual environments are listed but not preselected.")
+                .font(Type.text(12))
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            RefreshLine(state: store.projectArtifactsState) { Task { await store.scanProjectArtifacts() } }
+            if loading {
+                SpaceProgressPanel(title: "Searching code folders", info: store.progress["projects"]) { store.cancel("projects") }
+            }
+            if store.projectArtifactsState.loadedAt != nil {
+                let byGroup = Dictionary(grouping: items, by: \.group)
+                    .map { ($0.key, $0.value.reduce(Int64(0)) { $0 + $1.bytes }) }
+                    .sorted { $0.1 > $1.1 }
+                TileGrid {
+                    StatTile(label: "Folders", value: Format.count(items.count), icon: "folder")
+                    StatTile(label: "Total size", value: Format.bytes(items.reduce(0) { $0 + $1.bytes }), tint: Theme.accent, icon: "internaldrive")
+                    StatTile(label: "Safe to remove", value: Format.bytes(items.filter(\.autoselect).reduce(0) { $0 + $1.bytes }), icon: "checkmark.seal")
+                    StatTile(label: "Largest kind", value: byGroup.first.map(\.0) ?? "—", icon: "hammer")
+                }
+                SpaceFileList(
+                    files: files,
+                    title: "Build folders",
+                    activityTitle: "Project build files removed",
+                    confirmMessage: "The selected folders move to the Trash. Rebuild them with your package manager or build tool (npm install, cargo build, swift build…).",
+                    preselect: { preselected.contains($0.path) },
+                    badge: { f in preselected.contains(f.path) ? nil : ("Review", Theme.warning) },
+                    detail: { f in "\(Format.abbreviated((f.path as NSString).deletingLastPathComponent)) · \(f.note) · last active \(Format.relative(f.modified))" },
+                    remove: { chosen in
+                        let set = Set(chosen.map(\.path))
+                        return await store.clean(store.projectArtifacts.filter { set.contains($0.path) }, title: "Project build files moved to Trash")
+                    }
+                )
+            }
+        }
+        .task { if store.projectArtifactsState == .idle { await store.scanProjectArtifacts() } }
+    }
+}
+
 // MARK: - Cloud
 
 struct SpaceCloudScreen: View {
